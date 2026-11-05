@@ -466,7 +466,7 @@ local function draw_items(game, time)
     local def = data.weapons[it.weapon.id]
     local r = data.tiers[it.weapon.tier or 1]
     local bob = floor(sin(time * 4 + it.id) * 1.5)
-    local blink = it.life < 120 and (floor(time * 10) % 2 == 0)
+    local blink = it.life < 180 and (floor(time * 10) % 2 == 0)
     local tier = it.weapon.tier or 1
     local c = r.color
     local gx, gy = floor(it.x), floor(it.y)

@@ -468,7 +468,7 @@ test("fucile a pompa: piu' proiettili, danno alto a bruciapelo", function()
   local g, p1, p2 = duel("shotgun", nil, 18)
   run(g, 30, function(i) return { { attack_pressed = (i == 1) } } end)
   check(p2.hp <= 50, "danno insufficiente a bruciapelo: " .. p2.hp)
-  check(p1.weapon.ammo == 1 or p1.weapon.ammo == 2, "munizioni non scalate")
+  check(p1.weapon.ammo == data.weapons.shotgun.ammo - 1, "munizioni non scalate")
 end)
 
 test("fucile a pompa: a distanza fa pochissimo", function()
@@ -507,8 +507,63 @@ test("raccolta: chi ha un'arma la scambia col tasto raccogli", function()
   g:add_item(p1.x, p1.y - 4, g:make_weapon("hammer", "common"))
   run(g, 5)
   check(p1.weapon.id == "sword", "ha scambiato senza premere")
-  g:update({ { pickup_pressed = true } })
+  g:update({ { pickup_pressed = true, pickup_held = true } })
+  g:update({})                                  -- rilascio: e' un tocco
   check(p1.weapon.id == "hammer", "scambio non riuscito")
+  local sword_on_ground = false
+  for _, it in ipairs(g.items) do if it.weapon.id == "sword" then sword_on_ground = true end end
+  check(sword_on_ground, "la spada scambiata non e' rimasta a terra")
+end)
+
+test("lancio: un'arma con munizioni lanciata resta a terra raccoglibile", function()
+  local g, p1, p2 = duel("pistol", nil, 300)
+  p2.invuln = 1e9
+  local ammo = p1.weapon.ammo
+  run(g, 3, function(i) return { { throw_pressed = (i == 1) } } end)
+  check(p1.weapon == nil, "l'arma non e' stata lanciata")
+  run(g, 90)
+  local it
+  for _, x in ipairs(g.items) do if x.weapon.id == "pistol" then it = x end end
+  check(it, "la pistola lanciata non e' a terra")
+  check(it.weapon.ammo == ammo, "munizioni perse nel lancio")
+end)
+
+test("lancio: un'arma scarica lanciata si rompe", function()
+  local g, p1, p2 = duel("pistol", nil, 300)
+  p2.invuln = 1e9
+  p1.weapon.ammo = 0
+  run(g, 3, function(i) return { { attack_pressed = (i == 1) } } end)
+  check(p1.weapon == nil, "l'arma scarica non e' stata lanciata attaccando")
+  run(g, 90)
+  for _, x in ipairs(g.items) do check(x.weapon.id ~= "pistol", "l'arma scarica e' rimasta a terra") end
+end)
+
+test("lancio: il tasto raccogli non lancia piu' l'arma", function()
+  local g, p1, p2 = duel("pistol", nil, 300)
+  run(g, 20, function(i) return { { pickup_pressed = (i == 1), pickup_held = (i < 15) } } end)
+  check(p1.weapon and p1.weapon.id == "pistol", "il tasto raccogli ha lanciato l'arma")
+end)
+
+test("eliminazione: l'arma con munizioni resta a terra, quella consumata no", function()
+  local g, p1, p2, p3 = nil
+  g, p1, p2 = duel("pistol", "sword", 300)
+  p2.weapon.uses = 0
+  Combat.kill(g, p1, nil, "test")
+  local ids = {}
+  for _, x in ipairs(g.items) do ids[x.weapon.id] = true end
+  check(ids.pistol, "la pistola del giocatore eliminato non e' a terra")
+end)
+
+test("armi a terra: durano 20 s e al massimo 12", function()
+  local g, p1, p2 = duel(nil, nil, 300)
+  p1.invuln, p2.invuln = 1e9, 1e9
+  pin(p1, 40, p1.y); pin(p2, 60, p2.y)
+  for k = 1, 15 do g:add_item(200 + k * 10, p1.y - 4, g:make_weapon("pistol")) end
+  check(#g.items == data.round.max_ground, "armi a terra: " .. #g.items)
+  run(g, data.round.item_life - 10, function() pin(p1, 40, p1.y); pin(p2, 60, p2.y); return {} end)
+  check(#g.items > 0, "sparite troppo presto")
+  run(g, 20, function() pin(p1, 40, p1.y); pin(p2, 60, p2.y); return {} end)
+  check(#g.items == 0, "non sono sparite dopo 20 s")
 end)
 
 test("trappole: gli spuntoni fanno danno", function()
@@ -1099,7 +1154,8 @@ local function random_inputs(rng, n)
       my = (rng:float() * 2 - 1) * (chance(0.3) and 1 or 0),
       jump_pressed = chance(0.05), jump_held = chance(0.4),
       attack_pressed = chance(0.12), attack_held = chance(0.3), dash_pressed = chance(0.04),
-      parry_pressed = chance(0.04), pickup_pressed = chance(0.03),
+      parry_pressed = chance(0.04), pickup_pressed = chance(0.03), pickup_held = chance(0.3),
+      throw_pressed = chance(0.01),
     }
     if chance(0.5) then
       inputs[i].ax, inputs[i].ay = rng:float() * 2 - 1, rng:float() * 2 - 1

@@ -207,6 +207,14 @@ function Game:crate_weapon()
   return self:random_weapon(self.rng:weighted(entries))
 end
 
+-- true se l'arma ha ancora munizioni o colpi (le armi consumate si rompono)
+function Game.charged(w)
+  if not w then return false end
+  if w.ammo then return w.ammo > 0 end
+  if w.uses then return w.uses > 0 end
+  return true
+end
+
 function Game:add_item(x, y, weapon, vx, vy)
   local it = {
     id = self.next_item_id, x = x, y = y, w = 10, h = 8,
@@ -215,14 +223,57 @@ function Game:add_item(x, y, weapon, vx, vy)
   }
   self.next_item_id = self.next_item_id + 1
   self.items[#self.items + 1] = it
+  -- troppe armi a terra: sparisce la piu' vecchia
+  while #self.items > data.round.max_ground do table.remove(self.items, 1) end
   return it
 end
 
--- Lascia cadere un'arma (morte o cambio arma)
-function Game:drop_item(x, y, weapon, vx)
-  local it = self:add_item(x, y, weapon, vx or 0, -120)
+-- Lascia a terra un'arma (scambio, lancio, eliminazione). Un'arma consumata si rompe.
+function Game:drop_item(x, y, weapon, vx, vy)
+  if not Game.charged(weapon) then
+    self:emit("break", x, y, { weapon = weapon and weapon.id })
+    return nil
+  end
+  weapon.out = nil
+  local it = self:add_item(x, y, weapon, vx or 0, vy or -120)
   it.pickup_delay = 20
+  it.dropped = true
   return it
+end
+
+-- Arma a terra piu' vicina che il giocatore tocca (nil se nessuna)
+function Game:item_near(p)
+  local x1, y1, x2, y2 = Player.box(p)
+  local best, bd
+  for _, it in ipairs(self.items) do
+    if it.pickup_delay <= 0
+       and Combat.overlap(x1 - 3, y1 - 3, x2 + 3, y2 + 3, it.x - 5, it.y - 8, it.x + 5, it.y) then
+      local d = math.abs(it.x - p.x)
+      if not bd or d < bd then best, bd = it, d end
+    end
+  end
+  return best
+end
+
+function Game:remove_item(item)
+  for i, it in ipairs(self.items) do
+    if it == item then table.remove(self.items, i); return true end
+  end
+  return false
+end
+
+-- Prende l'arma a terra; quella che si aveva in mano resta a terra intatta
+function Game:take_item(p, it)
+  self:remove_item(it)
+  if p.weapon then self:drop_item(p.x, p.y - 6, p.weapon, 0, -60) end
+  p.weapon = it.weapon
+  self:emit("pickup", p.x, p.y - 12, { id = p.id, weapon = p.weapon.id })
+end
+
+-- La fusione e' possibile tra l'arma in mano e quella a terra? (scritta nella Fusion)
+function Game:can_fuse(p, it)
+  local Fusion = package.loaded["src.sim.fusion"]
+  return Fusion and Fusion.can_fuse(p.weapon, it.weapon) or false
 end
 
 function Game:update_items()
@@ -238,6 +289,10 @@ function Game:update_items()
     local landed = world:move_y(it, it.vy * dt)
     if landed then it.vy = 0; it.grounded = true else it.grounded = false end
     if it.life <= 0 or it.y > world.height + 40 or (self.lava_on and it.y > self.lava_y) then
+      -- chi la stava fondendo perde la fusione
+      for _, p in ipairs(self.players) do
+        if p.fusing and p.fusing.item == it then self:cancel_fusion(p, "sparita") end
+      end
       table.remove(self.items, i)
     end
   end
@@ -250,7 +305,9 @@ function Game:update_spawner()
   if self.spawn_timer <= 0 then
     self.spawn_timer = self.rng:int(R.spawn_min, R.spawn_max)
     local pts = world.weapon_spawns
-    if #pts > 0 and (#self.items + #self.telegraphs) < R.max_items then
+    local spawned = 0
+    for _, it in ipairs(self.items) do if not it.dropped then spawned = spawned + 1 end end
+    if #pts > 0 and (spawned + #self.telegraphs) < R.max_items then
       local pt = self.rng:pick(pts)
       self.telegraphs[#self.telegraphs + 1] = { x = pt.x, y = pt.y - 6, t = R.telegraph,
                                                 weapon = self:random_weapon() }
@@ -276,36 +333,79 @@ function Game:update_spawner()
   end
 end
 
-function Game:update_pickups()
-  for _, p in ipairs(self.players) do
-    local attacking = p.action and p.action.type == "attack"
-    if p.alive and p.hitstun == 0 and p.clash == 0 and not attacking then
-      local wants = p.buf.pickup > 0
-      if wants or not p.weapon then
-        local x1, y1, x2, y2 = Player.box(p)
-        local found
-        for _, it in ipairs(self.items) do
-          if it.pickup_delay <= 0
-             and Combat.overlap(x1 - 3, y1 - 3, x2 + 3, y2 + 3, it.x - 5, it.y - 8, it.x + 5, it.y) then
-            found = it
-            break
+-- Raccolta, scambio, fusione e lancio.
+--   mani vuote: si raccoglie passando sopra un'arma
+--   tasto raccogli toccato (rilasciato entro tap_frames): scambio con l'arma a terra
+--   tasto raccogli tenuto: fusione, se possibile (altrimenti scambio al termine del tocco);
+--     la fusione richiede fuse_frames, il giocatore resta fermo e un colpo la interrompe
+--   tasto lancia: lancia l'arma in mano
+function Game:update_pickups(inputs)
+  local R = data.round
+  for i, p in ipairs(self.players) do
+    local inp = (inputs and inputs[i]) or EMPTY
+    local busy = not p.alive or p.hitstun > 0 or p.clash > 0 or p.bubble > 0
+                 or (p.action and p.action.type == "attack")
+    if busy then
+      if p.fusing then self:cancel_fusion(p, "interrotta") end
+      p.grab_t = 0
+    else
+      local held = inp.pickup_held
+      if p.fusing then
+        local it = p.fusing.item
+        local still = held and self:item_near(p) == it
+        if not still then
+          self:cancel_fusion(p, held and "lontano" or "rilasciata")
+        else
+          p.fusing.t = p.fusing.t + 1
+          if p.fusing.t >= R.fuse_frames then self:complete_fusion(p, it) end
+        end
+      elseif held then
+        p.grab_t = (p.grab_t or 0) + 1
+        local it = self:item_near(p)
+        if it and p.weapon and p.grab_t == R.tap_frames then
+          if self:can_fuse(p, it) then
+            p.fusing = { item = it, t = p.grab_t }
+            self:emit("fuse_start", p.x, p.y - 12, { id = p.id })
+          else
+            self:take_item(p, it)          -- niente fusione possibile: tenere premuto scambia
           end
         end
-        if found then
-          if p.weapon then self:drop_item(p.x, p.y - 6, p.weapon, 0) end
-          p.weapon = found.weapon
-          for i, it in ipairs(self.items) do
-            if it == found then table.remove(self.items, i); break end
-          end
-          p.buf.pickup = 0
-          self:emit("pickup", p.x, p.y - 12, { id = p.id, weapon = p.weapon.id })
-        elseif wants and p.weapon and not p.action then
-          p.buf.pickup = 0
-          Combat.throw_weapon(self, p)
+      else
+        if (p.grab_t or 0) > 0 and p.grab_t < R.tap_frames and p.weapon then
+          local it = self:item_near(p)
+          if it then self:take_item(p, it) end
         end
+        p.grab_t = 0
+      end
+      -- mani vuote: raccolta automatica
+      if not p.weapon and not p.fusing then
+        local it = self:item_near(p)
+        if it then self:take_item(p, it) end
+      end
+      -- lancio
+      if inp.throw_pressed and p.weapon and not p.action and not p.fusing then
+        Combat.throw_weapon(self, p)
       end
     end
   end
+end
+
+function Game:cancel_fusion(p, why)
+  p.fusing = nil
+  p.grab_t = 0
+  self:emit("fuse_cancel", p.x, p.y - 12, { id = p.id, why = why })
+end
+
+-- Completa la fusione (la logica dell'arma risultante e' in fusion.lua)
+function Game:complete_fusion(p, it)
+  local Fusion = require("src.sim.fusion")
+  p.fusing = nil
+  p.grab_t = -1e9            -- finche' non si rilascia il tasto non riparte niente
+  local fused = Fusion.fuse(p.weapon, it.weapon)
+  self:remove_item(it)
+  p.weapon = fused
+  self:emit("fused", p.x, p.y - 12, { id = p.id, weapon = fused.id, recipe = fused.recipe,
+                                       name = Fusion.name(fused) })
 end
 
 -- ---------------------------------------------------------------------------
@@ -386,7 +486,7 @@ function Game:update(inputs)
     Combat.update_projectiles(self)
     Combat.update_fields(self)
     self:update_items()
-    self:update_pickups()
+    self:update_pickups(inputs)
     self:update_hazards()
     self:update_lava()
     MapEvents.update(self)

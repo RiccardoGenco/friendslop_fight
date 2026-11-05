@@ -46,6 +46,7 @@ function Combat.kill(game, vic, killer, cause, wid)
   vic.death_cause = cause
   vic.action = nil
   if vic.weapon then
+    vic.fusing = nil
     game:drop_item(vic.x, vic.y - 4, vic.weapon, (killer and killer.id == vic.id) and 0 or sign(vic.vx) * 40)
     vic.weapon = nil
   end
@@ -366,9 +367,11 @@ function Combat.throw_weapon(game, p)
   local def = data.weapons[p.weapon and p.weapon.id or "fists"]
   Combat.new_projectile(game, p.id, p.x + ax * 6, p.y - 12, ax * P.throw_speed, ay * P.throw_speed,
     { dmg = P.throw_damage, kb = 140, life = 50, gravity = P.throw_gravity, w = 8, h = 6,
-      kind = "thrown", color = def.color, bounces = 1, bounce_keep = 0.5, wid = "lancio" })
+      kind = "thrown", color = def.color, bounces = 1, bounce_keep = 0.5, wid = "lancio",
+      carry = p.weapon })
   game:emit("throw", p.x, p.y - 12)
   p.weapon = nil
+  p.fusing = nil
 end
 
 -- Un proiettile si muove a passi di al massimo STEP pixel: anche i colpi velocissimi
@@ -600,6 +603,8 @@ function Combat.update_projectiles(game)
         game:emit("catch", pr.x, pr.y, { id = pr.owner })
       end
       if pr.wref then pr.wref.out = false end
+      -- un'arma lanciata, dopo il colpo, cade a terra se ha ancora munizioni (altrimenti si rompe)
+      if pr.carry then game:drop_item(pr.x - sign(pr.vx) * 6, pr.y - 4, pr.carry, -pr.vx * 0.15, -100) end
       table.remove(list, i)
     else
       i = i + 1

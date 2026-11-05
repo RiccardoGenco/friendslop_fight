@@ -33,6 +33,8 @@ function Player.new(id, spawn, color)
     burn = 0, burn_by = nil,     -- fuoco (lanciafiamme)
     bubble = 0,                  -- chiuso in una bolla (pistola a bolle)
     grapple = nil,               -- trainato dal rampino verso un punto
+    grab_t = 0,                  -- frame di pressione del tasto raccogli
+    fusing = nil,                -- fusione in corso: { item, t }
   }
   return p
 end
@@ -225,12 +227,19 @@ local function apply_movement(p, inp)
   p.vx = approach(p.vx, target, accel * data.dt)
 end
 
+local FUSING_INPUT = {}
+
 function Player.update(p, inp, game)
   if not p.alive then return end
   local P = data.player
   local dt = data.dt
   local world = game.world
   inp = inp or {}
+  -- durante la fusione si resta fermi: nessun movimento, salto o attacco
+  if p.fusing then
+    FUSING_INPUT.ax, FUSING_INPUT.ay = inp.ax, inp.ay
+    inp = FUSING_INPUT
+  end
 
   -- buffer degli input
   for _, k in ipairs(BUF_KEYS) do

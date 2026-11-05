@@ -49,7 +49,8 @@ function Bot.think(game, index, level)
   local L = Bot.LEVELS[level or 2] or Bot.LEVELS[2]
   local p = game.players[index]
   local inp = { mx = 0, my = 0, jump_held = false, jump_pressed = false, attack_pressed = false,
-                dash_pressed = false, parry_pressed = false, pickup_pressed = false }
+                dash_pressed = false, parry_pressed = false, pickup_pressed = false,
+                pickup_held = false, throw_pressed = false }
   if not p or not p.alive or game.phase ~= "playing" then return inp end
   local r = love.math.random
   local target = nearest_enemy(game, p)
@@ -192,7 +193,8 @@ function Bot.think(game, index, level)
       end
     end
   end
-  if p.weapon and r() < 0.002 then inp.pickup_pressed = true end
+  -- ogni tanto scambia l'arma con quella su cui passa (un tocco del tasto raccogli)
+  if p.weapon and r() < 0.002 then inp.pickup_pressed, inp.pickup_held = true, true end
   return inp
 end
 

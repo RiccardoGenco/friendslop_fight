@@ -11,15 +11,18 @@ local AIM_DEADZONE = 0.3       -- zona morta della levetta destra (mira)
 local TRIGGER_ON = 0.5
 
 local KEYBOARD = {
-  { name = "Tastiera 1", help = "WASD muovi, W/Spazio salta, J o click attacco, K scatto, L o click destro parry, U raccogli, mouse mira",
+  { name = "Tastiera 1",
+    help = "WASD muovi, Spazio salta, mouse mira, click attacca, click destro o Q parry, Shift scatto, E scambia (tieni: fondi), G lancia",
     left = "a", right = "d", up = "w", down = "s", jump = { "w", "space" },
-    attack = "j", dash = "k", parry = "l", pickup = "u", start = "return" },
-  { name = "Tastiera 2", help = "Frecce muovi e salta, Z attacco, X scatto, C parry, V raccogli",
+    attack = "j", dash = { "lshift", "k" }, parry = { "q", "l" }, pickup = { "e", "u" }, throw = "g",
+    start = "return" },
+  { name = "Tastiera 2",
+    help = "Frecce muovi e salta, Z attacco, X scatto, C parry, V scambia (tieni: fondi), B lancia",
     left = "left", right = "right", up = "up", down = "down", jump = { "up" },
-    attack = "z", dash = "x", parry = "c", pickup = "v", start = "rshift" },
+    attack = "z", dash = "x", parry = "c", pickup = "v", throw = "b", start = "rshift" },
 }
 
-local BUTTONS = { "jump", "attack", "dash", "parry", "pickup", "start" }
+local BUTTONS = { "jump", "attack", "dash", "parry", "pickup", "throw", "start" }
 
 local function new_slot(kind)
   return {
@@ -137,9 +140,9 @@ local function read_pad(s)
   r.jump = j:isGamepadDown("a")
   r.attack = j:isGamepadDown("x") or j:getGamepadAxis("triggerright") > TRIGGER_ON
   r.dash = j:isGamepadDown("b")
-  r.parry = j:isGamepadDown("leftshoulder") or j:isGamepadDown("rightshoulder")
-         or j:getGamepadAxis("triggerleft") > TRIGGER_ON
-  r.pickup = j:isGamepadDown("y")
+  r.parry = j:isGamepadDown("leftshoulder") or j:getGamepadAxis("triggerleft") > TRIGGER_ON
+  r.pickup = j:isGamepadDown("y")             -- tocco: scambia; tenuto: fonde
+  r.throw = j:isGamepadDown("rightshoulder")  -- lancia l'arma (RB / R1)
   r.start = j:isGamepadDown("start")
   return r
 end
@@ -161,9 +164,10 @@ local function read_kb(s)
   if love.keyboard.isDown(k.down) then r.my = r.my + 1 end
   r.jump = any_down(k.jump)
   r.attack = love.keyboard.isDown(k.attack) or (s.kb == 1 and Input.mouse.active and Input.mouse_held())
-  r.dash = love.keyboard.isDown(k.dash)
-  r.parry = love.keyboard.isDown(k.parry)
-  r.pickup = love.keyboard.isDown(k.pickup)
+  r.dash = any_down(k.dash)
+  r.parry = any_down(k.parry)
+  r.pickup = any_down(k.pickup)
+  r.throw = any_down(k.throw)
   r.start = false   -- la tastiera usa Esc/Invio, gestiti da main
   return r
 end
@@ -190,9 +194,10 @@ function Input.consume(s)
     attack_held = c.attack or false,
     jump_pressed = p.jump or false, attack_pressed = p.attack or false,
     dash_pressed = p.dash or false, parry_pressed = p.parry or false,
-    pickup_pressed = p.pickup or false,
+    pickup_pressed = p.pickup or false, pickup_held = c.pickup or p.pickup or false,
+    throw_pressed = p.throw or false,
   }
-  p.jump, p.attack, p.dash, p.parry, p.pickup = nil, nil, nil, nil, nil
+  p.jump, p.attack, p.dash, p.parry, p.pickup, p.throw = nil, nil, nil, nil, nil, nil
   return out
 end
 
