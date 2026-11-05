@@ -29,6 +29,21 @@ function Shot.start(args)
       if sc == "game" then
         snap(100, "countdown"); snap(420, "game1"); snap(700, "game2"); snap(1100, "game3"); snap(1600, "game4")
       elseif sc == "pause" then at(500, key("escape")); snap(530, "pause")
+      elseif sc == "recipes" then
+        -- i giocatori usano le ricette speciali, quattro alla volta
+        local list = require("src.sim.recipes")
+        for wave = 0, 3 do
+          at(260 + wave * 150, function()
+            local g = __smoke_game(); if not g then return end
+            local Fusion = require("src.sim.fusion")
+            for k, p in ipairs(g.players) do
+              local r = list[(wave * 4 + k - 1) % #list + 1]
+              if p.alive then p.weapon = Fusion.fuse({ id = r.a }, { id = r.b }); p.invuln = 400 end
+            end
+          end)
+          snap(330 + wave * 150, "recipes" .. (wave + 1))
+          snap(350 + wave * 150, "recipes" .. (wave + 1) .. "b")
+        end
       elseif sc == "fusion" then
         -- armi fuse in mano, anteprime e una fusione in corso: giocatori fermi, armi ai loro piedi
         local spots

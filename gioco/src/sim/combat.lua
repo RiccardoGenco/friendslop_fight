@@ -73,7 +73,7 @@ local function land_hit(game, atk, vic, spec)
   if spec.effect then effs[#effs + 1] = spec.effect end
   if spec.effects then for _, e in ipairs(spec.effects) do effs[#effs + 1] = e end end
   local has_bubble = false
-  for _, e in ipairs(effs) do if e == "bubble" then has_bubble = true end end
+  for _, e in ipairs(effs) do if e == "bubble" or e == "bubblerocket" then has_bubble = true end end
 
   -- un colpo fa scoppiare la bolla, con danno extra (una bolla nuova invece la rinnova)
   if vic.bubble > 0 and not has_bubble then
@@ -117,6 +117,20 @@ local function land_hit(game, atk, vic, spec)
       vic.action, vic.grapple, vic.fusing = nil, nil, nil
       vic.vx, vic.vy = vic.vx * 0.3, 0
       game:emit("bubbled", vic.x, vic.y - 10, { id = vic.id })
+    elseif eff == "bubblerocket" then
+      -- Bolla razzo: la bolla parte come un razzo ed esplode contro il primo muro
+      vic.bubble = 100
+      vic.rocket = { vx = dir * 520, vy = -50, by = atk and atk.id or nil }
+      vic.action, vic.grapple, vic.fusing = nil, nil, nil
+      game:emit("bubbled", vic.x, vic.y - 10, { id = vic.id })
+    elseif eff == "slow" then
+      vic.slow = 90
+    elseif eff == "pullself" and atk and atk.alive and atk.id ~= vic.id then
+      -- Catena falciante: chi colpisce viene trascinato fino al bersaglio
+      local side = (atk.x < vic.x) and -1 or 1
+      atk.grapple = { x = vic.x + side * 12, y = vic.y, t = 30 }
+      atk.invuln = max(atk.invuln, 14)
+      game:emit("grapple", vic.x, vic.y - 10, { id = atk.id })
     elseif eff == "hookpull" and atk and atk.alive and atk.id ~= vic.id then
       -- rampino: trascina la vittima verso chi ha sparato
       local dx, dy = atk.x - vic.x, (atk.y - 6) - vic.y
@@ -225,7 +239,7 @@ function Combat.hit(game, atk, vic, spec)
   local a = vic.action
   -- scudo in mano e non si sta attaccando: para tutto cio' che arriva da davanti
   local vdef = vic.weapon and (vic.weapon.def or data.weapons[vic.weapon.id])
-  if vdef and (vdef.id == "shield" or vdef.guard) and not (a and a.type == "attack")
+  if vdef and (vdef.id == "shield" or vdef.guard) and not vic.weapon.out and not (a and a.type == "attack")
      and vic.hitstun <= 0 and vic.bubble <= 0 then
     local sx = spec.src_x or (atk and atk.x) or vic.x
     if (sx - vic.x) * vic.facing > -2 then
@@ -644,6 +658,8 @@ function Combat.update_projectiles(game)
         Combat.open_blackhole(game, pr.x, pr.y, pr.field, pr.owner)
       elseif outcome == "catch" then
         game:emit("catch", pr.x, pr.y, { id = pr.owner })
+        -- Granata boomerang presa al volo: torna nel caricatore
+        if pr.refund and pr.wref and pr.wref.ammo then pr.wref.ammo = pr.wref.ammo + 1 end
       end
       if pr.wref then pr.wref.out = false end
       -- un'arma lanciata, dopo il colpo, cade a terra se ha ancora munizioni (altrimenti si rompe)

@@ -34,6 +34,8 @@ function Player.new(id, spawn, color)
     bubble = 0,                  -- chiuso in una bolla (pistola a bolle)
     grapple = nil,               -- trainato dal rampino verso un punto
     grab_t = 0,                  -- frame di pressione del tasto raccogli
+    slow = 0,                    -- rallentato (Sciame d'api)
+    rocket = nil,                -- bolla lanciata come un razzo (Bolla razzo)
     fusing = nil,                -- fusione in corso: { item, t }
   }
   return p
@@ -210,6 +212,7 @@ local function apply_movement(p, inp)
   local a = p.action
   local mult = 1
   if Player.tier(p) >= 1 then mult = mult + M.speed_bonus end
+  if p.slow > 0 then mult = mult * 0.55 end
   local target = (inp.mx or 0) * P.run_speed * mult
   if abs(inp.mx or 0) < 0.2 then target = 0 end
   if a and a.type == "attack" then
@@ -266,6 +269,25 @@ function Player.update(p, inp, game)
   end
 
   -- bolla: si galleggia verso l'alto senza poter agire; premere tasti libera prima
+  if p.bubble > 0 and p.rocket then
+    -- Bolla razzo: niente da fare, si vola fino al primo muro e si esplode
+    local r = p.rocket
+    p.bubble = p.bubble - 1
+    p.action, p.grapple = nil, nil
+    p.vx, p.vy = r.vx, r.vy
+    local world = game.world
+    local hit = world:move_x(p, p.vx * dt)
+    local landed, bumped = world:move_y(p, p.vy * dt, false)
+    p.grounded = false
+    if game.frame % 2 == 0 then game:emit("rocket_trail", p.x - (r.vx > 0 and 10 or -10), p.y - 10) end
+    if hit or landed or bumped or p.bubble <= 0 then
+      p.bubble, p.rocket = 0, nil
+      p.vx, p.vy = 0, 0
+      Combat.explode(game, p.x, p.y - 10, { radius = 46, dmg = 40, kb = 380 },
+                     r.by and game.players[r.by] or nil, "bubblerocket")
+    end
+    return
+  end
   if p.bubble > 0 then
     p.bubble = p.bubble - 1
     for _, k in ipairs(BUF_KEYS) do
@@ -286,6 +308,7 @@ function Player.update(p, inp, game)
   end
 
   -- timer
+  if p.slow > 0 then p.slow = p.slow - 1 end
   if p.dash_cd > 0 then p.dash_cd = p.dash_cd - 1 end
   if p.invuln > 0 then p.invuln = p.invuln - 1 end
   if p.drop_timer > 0 then p.drop_timer = p.drop_timer - 1 end

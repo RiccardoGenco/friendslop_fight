@@ -472,6 +472,16 @@ local function draw_player(p, game, time)
       lg.rectangle("fill", fx, y - 6 - ph * 22, 2, 2)
     end
   end
+  -- Bolla razzo: fiammata dietro la bolla
+  if p.rocket then
+    local dir = p.rocket.vx > 0 and -1 or 1
+    lg.setBlendMode("add")
+    for j = 1, 4 do
+      lg.setColor(1, 0.6 - j * 0.1, 0.15, 0.6 - j * 0.12)
+      lg.circle("fill", x + dir * (14 + j * 4), y - 10 + sin(time * 30 + j) * 1.5, 5 - j)
+    end
+    lg.setBlendMode("alpha")
+  end
   -- bolla
   if p.bubble > 0 then
     local wob = sin(time * 8) * 1.2
@@ -785,6 +795,49 @@ local function draw_projectiles(game, time)
     elseif pr.kind == "thrown" then
       lg.setColor(col[1], col[2], col[3])
       lg.rectangle("fill", pr.x - 4, pr.y - 3, 8, 6)
+    elseif pr.kind == "tornado" then
+      -- vortice di fuoco: anelli schiacciati che girano, piu' larghi in alto
+      lg.setBlendMode("add")
+      for j = 0, 6 do
+        local yy = pr.y + 14 - j * 5
+        local rr = 4 + j * 1.6
+        local ph = pr.age * 0.5 + j * 0.9
+        lg.setColor(1, 0.75 - j * 0.07, 0.2, 0.55)
+        lg.ellipse("line", pr.x + sin(ph) * 2, yy, rr, 1.6)
+        lg.setColor(1, 0.5, 0.1, 0.25)
+        lg.ellipse("fill", pr.x + sin(ph) * 2, yy, rr * 0.8, 1.4)
+      end
+      lg.setBlendMode("alpha")
+    elseif pr.kind == "bubblebomb" then
+      local wob = sin(pr.age * 0.3) * 0.8
+      lg.setColor(0.6, 0.75, 1, 0.25)
+      lg.circle("fill", pr.x, pr.y, 6 + wob)
+      lg.setColor(0.85, 0.9, 1, 0.9)
+      lg.circle("line", pr.x, pr.y, 6 + wob)
+      -- mina dentro la bolla, con la spia che lampeggia
+      lg.setColor(0.35, 0.35, 0.32)
+      lg.rectangle("fill", pr.x - 3, pr.y - 1.5, 6, 3)
+      if floor(time * 6) % 2 == 0 then lg.setColor(1, 0.25, 0.2); lg.rectangle("fill", pr.x - 0.5, pr.y - 2.5, 1, 1) end
+    elseif pr.kind == "harpoon" then
+      local o = game.players[pr.owner]
+      if o and o.alive then
+        lg.setColor(0.75, 0.7, 0.6, 0.9)
+        lg.line(o.x, o.y - 11, pr.x, pr.y)
+      end
+      lg.push()
+      lg.translate(pr.x, pr.y)
+      lg.rotate(atan2(pr.vy, pr.vx))
+      lg.translate(-14, 0)
+      draw_weapon_shape("spear", data.weapons.spear.color)
+      lg.pop()
+    elseif pr.kind == "bee" then
+      lg.setColor(1, 0.85, 0.2)
+      lg.rectangle("fill", pr.x - 1.5, pr.y - 1, 3, 2)
+      lg.setColor(0.15, 0.1, 0.05)
+      lg.rectangle("fill", pr.x - 0.5, pr.y - 1, 1, 2)
+      lg.setColor(1, 1, 1, 0.7)
+      local flap = (floor(pr.age / 2) % 2 == 0) and -2 or -1.5
+      lg.rectangle("fill", pr.x - 1, pr.y + flap, 2, 1)
     elseif pr.kind == "boomerang" and pr.spin_of then
       local sd = data.weapons[pr.spin_of]
       lg.push()

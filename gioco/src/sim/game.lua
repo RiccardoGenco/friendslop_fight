@@ -10,6 +10,8 @@ local RNG = require("src.sim.rng")
 local World = require("src.sim.world")
 local Player = require("src.sim.player")
 local Combat = require("src.sim.combat")
+require("src.sim.fusion")
+require("src.sim.recipes")      -- registra le ricette speciali nella fusione
 local MapEvents = require("src.sim.mapevents")
 local Movers = require("src.sim.movers")
 local Gadgets = require("src.sim.gadgets")

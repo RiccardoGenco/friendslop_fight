@@ -370,6 +370,8 @@ function Fx.handle(e, game)
   elseif t == "break" then
     Fx.burst(e.x, e.y, { 0.8, 0.8, 0.8 }, 10, 120, 0.4, 300)
     Audio.play("break_")
+  elseif t == "rocket_trail" then
+    Fx.puffs(e.x, e.y, { 0.6, 0.6, 0.6 }, 1, 20, 0.5, -30, 3, 2)
   elseif t == "fuse_start" then
     Audio.play("tick", 0.7, 0.6)
   elseif t == "fuse_cancel" then

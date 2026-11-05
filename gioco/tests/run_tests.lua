@@ -1303,6 +1303,167 @@ test("tratti: scudo corazzato para, l'arma in mano con Guardia consuma munizioni
   check(p2.weapon.ammo == ammo - 1, "la parata non ha consumato munizioni")
 end)
 
+-- --------------------------------------------------------------------------
+-- ricette speciali
+
+local Recipes = require("src.sim.recipes")
+
+local function with_recipe(a, b, gap)
+  local g, p1, p2 = duel(nil, nil, gap or 120)
+  p1.weapon = Fusion.fuse({ id = a }, { id = b })
+  return g, p1, p2
+end
+
+local function count_ev(g, frames, kind, fn)
+  local n = 0
+  for i = 1, frames do
+    g:update(fn and fn(i) or {})
+    for _, e in ipairs(g:drain_events()) do if e.type == kind then n = n + 1 end end
+  end
+  return n
+end
+
+test("ricette: 14, ognuna con nome, in entrambi gli ordini", function()
+  check(#Recipes == 14, "ricette: " .. #Recipes)
+  for _, r in ipairs(Recipes) do
+    local w1 = Fusion.fuse({ id = r.a }, { id = r.b })
+    local w2 = Fusion.fuse({ id = r.b }, { id = r.a })
+    check(w1.fused.recipe == r.id and w2.fused.recipe == r.id, r.id .. ": ricetta non riconosciuta")
+    check(Fusion.name(w1) == r.name, r.id .. ": nome " .. Fusion.name(w1))
+    check(Fusion.preview({ id = r.a }, { id = r.b }, {}) == "???", r.id .. ": l'anteprima svela la ricetta")
+    check(Fusion.preview({ id = r.a }, { id = r.b }, { [r.id] = true }) == r.name, r.id .. ": anteprima scoperta")
+  end
+end)
+
+test("ricetta Tornado di fuoco: avanza lento, spinge e incendia", function()
+  local g, p1, p2 = with_recipe("flamer", "gust", 90)
+  run(g, 80, function(i) return { { attack_pressed = (i == 1) } } end)
+  check(p2.burn > 0, "non incendia")
+  check(math.abs(p2.vx) > 100 or p2.x > 300 + 0 or p2.hp < 100, "non spinge")
+end)
+
+test("ricetta Bolle bomba: esplode toccando un avversario", function()
+  local g, p1, p2 = with_recipe("bubble", "mines", 100)
+  local boom = count_ev(g, 120, "explosion", function(i) pin(p2, p2.x, p2.y); return { { attack_pressed = (i == 1) } } end)
+  check(boom >= 1 and p2.hp < 100, "nessuna esplosione sul bersaglio")
+end)
+
+test("ricetta Bolla razzo: imprigiona, vola ed esplode al muro", function()
+  local g, p1, p2 = with_recipe("bubble", "bazooka", 80)
+  local boom = count_ev(g, 200, "explosion", function(i) return { { attack_pressed = (i == 1) } } end)
+  check(boom >= 1, "la bolla razzo non e' esplosa")
+  check(p2.hp < 100, "il bersaglio non ha subito danni")
+end)
+
+test("ricetta Arpione: trascina chi colpisce", function()
+  local g, p1, p2 = with_recipe("spear", "hook", 200)
+  local pulled = false
+  for i = 1, 30 do
+    g:update({ { attack_pressed = (i == 1), ax = 1, ay = 0 } })
+    if p2.vx < -200 then pulled = true end
+  end
+  check(pulled and p2.hp < 100, "l'arpione non trascina")
+end)
+
+test("ricetta Catena falciante: chi colpisce arriva sul bersaglio", function()
+  local g, p1, p2 = with_recipe("katana", "hook", 200)
+  local x0 = p1.x
+  run(g, 40, function(i) pin(p2, p2.x, p2.y); return { { attack_pressed = (i == 1), ax = 1, ay = 0 } } end)
+  check(p2.hp < 100, "nessun danno")
+  check(p1.x - x0 > 100, "chi colpisce non e' arrivato sul bersaglio: " .. (p1.x - x0))
+end)
+
+test("ricetta Martello a reazione: scatto in avanti ed esplosione", function()
+  local g, p1, p2 = with_recipe("hammer", "bazooka", 70)
+  local x0 = p1.x
+  local boom = count_ev(g, 40, "explosion", function(i) return { { attack_pressed = (i == 1) } } end)
+  check(boom == 1, "esplosioni: " .. boom)
+  check(p1.x - x0 > 30 and p2.hp < 100, "nessuno scatto o nessun danno")
+end)
+
+test("ricetta Scudo volante: torna in mano, e in volo non protegge", function()
+  local g, p1, p2 = with_recipe("shield", "boomerang", 140)
+  local caught = count_ev(g, 160, "catch", function(i) return { { attack_pressed = (i == 1) } } end)
+  check(caught == 1 and p2.hp < 100, "lo scudo non e' tornato o non ha colpito")
+  -- in volo: un colpo frontale passa
+  p1.weapon.out = true
+  local hp = p1.hp
+  local res = Combat.hit(g, p2, p1, { dmg = 10, kb = 0, src_x = p1.x + p1.facing * 20 })
+  check(res ~= "blocked" and p1.hp < hp, "lo scudo in volo ha parato")
+end)
+
+test("ricetta Granata boomerang: presa al volo torna nel caricatore", function()
+  local g, p1, p2 = with_recipe("grenade", "boomerang", 400)
+  p2.invuln = 1e9
+  local ammo = p1.weapon.ammo
+  local caught = count_ev(g, 100, "catch", function(i) pin(p1, p1.x, p1.y); return { { attack_pressed = (i == 1), ax = 1, ay = -0.3 } } end)
+  check(caught == 1, "la granata non e' tornata")
+  check(p1.weapon.ammo == ammo, "munizione non restituita: " .. p1.weapon.ammo)
+end)
+
+test("ricetta Frusta di fuoco: tira, incendia e lascia fiamme", function()
+  local g, p1, p2 = with_recipe("whip", "flamer", 40)
+  local hit_vx
+  for i = 1, 30 do
+    g:update({ { attack_pressed = (i == 1) } })
+    if p2.hp < 100 and not hit_vx then hit_vx = p2.vx end
+  end
+  check(hit_vx and hit_vx < 0, "non tira")
+  check(p2.burn > 0, "non incendia")
+end)
+
+test("ricetta Sciame d'api: le api inseguono e rallentano", function()
+  local g, p1, p2 = with_recipe("smg", "bubble", 200)
+  run(g, 90, function(i) pin(p2, p2.x, p2.y); return { { attack_held = (i < 20), ax = 0.3, ay = -1 } } end)
+  check(p2.hp < 100, "le api sparate verso l'alto non hanno raggiunto il bersaglio")
+  check(p2.slow > 0, "nessun rallentamento")
+end)
+
+test("ricetta Pompa a bolle: sei bolle a ventaglio", function()
+  local g, p1, p2 = with_recipe("shotgun", "bubble", 80)
+  run(g, 8, function(i) return { { attack_pressed = (i == 1) } } end)
+  local n = 0
+  for _, pr in ipairs(g.projectiles) do if pr.kind == "bubble" then n = n + 1 end end
+  check(n == 6, "bolle: " .. n)
+  run(g, 40)
+  check(p2.bubble > 0, "nessuna bolla sul bersaglio")
+end)
+
+test("ricetta Cannone a vento: attraversa e spinge tutti sulla linea", function()
+  local g = Game.new({ players = 3, seed = 7, first_map = "prova" })
+  start_playing(g)
+  g.items, g.telegraphs = {}, {}
+  g.spawn_timer, g.crate_timer = 1e9, 1e9
+  local fy = 21 * data.tile
+  local p1, p2, p3 = g.players[1], g.players[2], g.players[3]
+  pin(p1, 100, fy); p1.facing = 1
+  pin(p2, 250, fy); pin(p3, 400, fy)
+  p1.weapon = Fusion.fuse({ id = "gust" }, { id = "sniper" })
+  local pushed2, pushed3 = false, false
+  for i = 1, 60 do
+    g:update({ { attack_pressed = (i == 1) } })
+    if p2.vx > 300 then pushed2 = true end
+    if p3.vx > 300 then pushed3 = true end
+  end
+  check(pushed2 and pushed3, "non ha spinto entrambi")
+end)
+
+test("ricetta Pioggia di mine: cinque mine", function()
+  local g, p1, p2 = with_recipe("mines", "shotgun", 300)
+  p2.invuln = 1e9
+  run(g, 60, function(i) return { { attack_pressed = (i == 1), ax = 1, ay = -0.4 } } end)
+  local n = 0
+  for _, pr in ipairs(g.projectiles) do if pr.kind == "mine" then n = n + 1 end end
+  check(n == 5, "mine: " .. n)
+end)
+
+test("ricetta Spada di ritorno: colpisce e torna in mano", function()
+  local g, p1, p2 = with_recipe("sword", "boomerang", 120)
+  local caught = count_ev(g, 160, "catch", function(i) return { { attack_pressed = (i == 1) } } end)
+  check(caught == 1, "la spada non e' tornata")
+  check(p2.hp < 100, "nessun danno")
+end)
+
 local function random_inputs(rng, n)
   local inputs = {}
   for i = 1, n do
