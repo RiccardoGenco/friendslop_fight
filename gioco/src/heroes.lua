@@ -313,8 +313,123 @@ function Heroes.hand_color(hero, skin_i)
   return Heroes.skin(Heroes.get(hero), skin_i).pal.F
 end
 
+-- ---------------------------------------------------------------------------
+-- Eroi da immagine (pixel art generata e ripulita): assets/heroes/<id>_<skin>.png
+-- Se il file c'e' si usa quello, animato via codice; altrimenti il disegno a griglia.
+
+local images = {}
+local outline_shader, white_shader
+local function shaders()
+  if outline_shader ~= nil then return end
+  local ok1, a = pcall(love.graphics.newShader, [[
+    extern vec4 col;
+    vec4 effect(vec4 c, Image tex, vec2 uv, vec2 sc) { return vec4(col.rgb, col.a * Texel(tex, uv).a); }
+  ]])
+  outline_shader = ok1 and a or false
+  white_shader = outline_shader
+end
+
+local function hero_image(hero, skin_i)
+  local key = hero .. "_" .. skin_i
+  local e = images[key]
+  if e ~= nil then return e end
+  e = false
+  local path = "assets/heroes/" .. key .. ".png"
+  if love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(path) then
+    local ok, img = pcall(love.graphics.newImage, path)
+    if ok and img and img.getDimensions then
+      img:setFilter("nearest", "nearest")
+      local w, h = img:getDimensions()
+      e = { img = img, w = w, h = h, ox = w / 2 }
+      -- foglio di pose: assets/heroes/<id>_<skin>.lua = { fw, fh, ox, frames }
+      -- ordine delle pose: fermo, corsa 1, corsa 2, salto, caduta, scatto
+      local meta = "assets/heroes/" .. key .. ".lua"
+      if love.filesystem.getInfo(meta) then
+        local ok2, m = pcall(function() return love.filesystem.load(meta)() end)
+        if ok2 and type(m) == "table" and m.frames then
+          e.quads = {}
+          for i = 1, m.frames do e.quads[i] = love.graphics.newQuad((i - 1) * m.fw, 0, m.fw, m.fh, w, h) end
+          e.w, e.h, e.ox = m.fw, m.fh, m.ox
+        end
+      end
+    end
+  end
+  images[key] = e
+  return e
+end
+Heroes.hero_image = hero_image
+
+local function draw_image_hero(e, p, team, a, flash, time, ps)
+  local x, y = floor(p.x), floor(p.y)
+  local f = p.facing or 1
+  if p.sliding and (p.wall or 0) ~= 0 then f = -p.wall end
+  local vx, vy = p.vx or 0, p.vy or 0
+  local dash = p.action and p.action.type == "dash"
+  -- posa via codice: respiro, passi, salto, caduta, scatto
+  local sx, sy, rot, oy, shear = 1, 1, 0, 0, 0
+  if dash then
+    sx, sy, rot, shear = 1.12, 0.9, 0.12, -0.25
+  elseif p.sliding then
+    rot = -0.08
+  elseif not p.grounded then
+    if vy < -40 then sx, sy, rot = 0.9, 1.1, -0.06 else sx, sy, rot = 1.04, 0.97, 0.08 end
+  elseif abs(vx) > 20 then
+    local ph = ((ps and ps.dist) or 0) / 6
+    oy = -abs(sin(ph)) * 1.5
+    rot = 0.1 + sin(ph * 2) * 0.03
+    sy = 1 - abs(cos(ph)) * 0.05
+    sx = 2 - sy
+  else
+    local b = sin(time * 2.5 + (p.id or 0) * 1.7)
+    sy, sx = 1 + b * 0.025, 1 - b * 0.015
+  end
+  -- posa dal foglio (se c'e'): il disegno mostra gia' il movimento, il codice lo accompagna
+  local q
+  if e.quads then
+    local n = #e.quads
+    local pick = 1
+    if dash then pick = 6
+    elseif not p.grounded and not p.sliding then pick = (vy < -40) and 4 or 5
+    elseif p.grounded and abs(vx) > 20 then
+      local ph = ((ps and ps.dist) or 0) / 6
+      pick = (sin(ph) >= 0) and 2 or 3
+      rot = rot * 0.4
+    end
+    q = e.quads[math.min(pick, n)]
+    if pick ~= 1 then sx, sy = 1 + (sx - 1) * 0.5, 1 + (sy - 1) * 0.5 end
+  end
+  local s = S
+  lg.push()
+  lg.translate(x, y + oy)
+  lg.rotate(rot * f)
+  lg.shear(shear * f, 0)
+  lg.scale(f * s * sx, s * sy)
+  shaders()
+  -- contorno nel colore del giocatore: si capisce chi e' chi anche in mischia
+  if outline_shader and team then
+    lg.setShader(outline_shader)
+    outline_shader:send("col", { team[1], team[2], team[3], 0.9 * a })
+    for _, d in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }) do
+      if q then lg.draw(e.img, q, -e.ox + d[1], -e.h + d[2]) else lg.draw(e.img, -e.ox + d[1], -e.h + d[2]) end
+    end
+    lg.setShader()
+  end
+  if flash and white_shader then
+    lg.setShader(white_shader)
+    white_shader:send("col", { 1, 1, 1, a })
+    if q then lg.draw(e.img, q, -e.ox, -e.h) else lg.draw(e.img, -e.ox, -e.h) end
+    lg.setShader()
+  else
+    lg.setColor(1, 1, 1, a)
+    if q then lg.draw(e.img, q, -e.ox, -e.h) else lg.draw(e.img, -e.ox, -e.h) end
+  end
+  lg.pop()
+end
+
 function Heroes.draw(hero, skin_i, p, team, alpha, flash, time, ps)
   lg = love.graphics
+  local img = hero_image(hero, skin_i or 1)
+  if img then return draw_image_hero(img, p, team, alpha or 1, flash, time, ps) end
   local h = Heroes.get(hero)
   local P = full_pal(Heroes.skin(h, skin_i).pal)
   local tint = flash and white or nil
@@ -413,6 +528,17 @@ end
 -- gray: versione spenta per chi e' eliminato
 function Heroes.draw_head(hero, skin_i, x, y, s, alpha, gray)
   lg = love.graphics
+  local e = hero_image(hero, skin_i or 1)
+  if e then
+    if not e.head then
+      local iw, ih = e.img:getDimensions()
+      e.head = lg.newQuad(0, 0, e.w, floor(e.h * 0.55), iw, ih)
+    end
+    local k = (s or 1) * 12 / e.w * 1.25
+    if gray then lg.setColor(0.45, 0.45, 0.45, alpha or 1) else lg.setColor(1, 1, 1, alpha or 1) end
+    lg.draw(e.img, e.head, x - 2, y - 2, 0, k, k)
+    return
+  end
   local h = Heroes.get(hero)
   local P = full_pal(Heroes.skin(h, skin_i).pal)
   local tint = nil
