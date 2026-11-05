@@ -270,10 +270,9 @@ function Game:take_item(p, it)
   self:emit("pickup", p.x, p.y - 12, { id = p.id, weapon = p.weapon.id })
 end
 
--- La fusione e' possibile tra l'arma in mano e quella a terra? (scritta nella Fusion)
+-- La fusione e' possibile tra l'arma in mano e quella a terra?
 function Game:can_fuse(p, it)
-  local Fusion = package.loaded["src.sim.fusion"]
-  return Fusion and Fusion.can_fuse(p.weapon, it.weapon) or false
+  return require("src.sim.fusion").can_fuse(p.weapon, it.weapon)
 end
 
 function Game:update_items()

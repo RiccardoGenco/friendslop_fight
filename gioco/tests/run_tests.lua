@@ -1145,6 +1145,164 @@ test("lanciasciame: i missili inseguono l'avversario", function()
   check(p2.hp < 100, "i missili sparati verso l'alto non hanno raggiunto il bersaglio")
 end)
 
+-- --------------------------------------------------------------------------
+-- fusione delle armi
+
+local Fusion = require("src.sim.fusion")
+
+-- tiene premuto il tasto raccogli per n frame, fermo sull'arma a terra
+local function hold_pickup(g, frames, extra)
+  for i = 1, frames do
+    local inp = { pickup_pressed = (i == 1), pickup_held = true }
+    if extra then for k, v in pairs(extra(i) or {}) do inp[k] = v end end
+    g:update({ inp })
+  end
+  g:update({})
+end
+
+local function fuse_setup(held, ground)
+  local g, p1, p2 = duel(held, nil, 300)
+  p2.invuln = 1e9
+  pin(p2, 40, p2.y)
+  g:add_item(p1.x, p1.y - 4, g:make_weapon(ground))
+  run(g, 3)
+  return g, p1, p2
+end
+
+test("fusione: tenendo premuto mezzo secondo le armi si fondono", function()
+  local g, p1 = fuse_setup("pistol", "flamer")
+  hold_pickup(g, data.round.fuse_frames + 2)
+  check(p1.weapon and p1.weapon.fused, "nessuna fusione")
+  check(p1.weapon.fused.body == "pistol" and p1.weapon.fused.trait == "fuoco", "ingredienti sbagliati")
+  check(#g.items == 0, "l'arma a terra non e' stata consumata")
+  check(Fusion.name(p1.weapon) == "Pistola infuocata", "nome: " .. Fusion.name(p1.weapon))
+end)
+
+test("fusione: un tocco scambia invece di fondere", function()
+  local g, p1 = fuse_setup("pistol", "flamer")
+  hold_pickup(g, 3)
+  check(p1.weapon.id == "flamer" and not p1.weapon.fused, "il tocco non ha scambiato")
+end)
+
+test("fusione: lasciando prima del tempo non succede niente", function()
+  local g, p1 = fuse_setup("pistol", "flamer")
+  hold_pickup(g, data.round.fuse_frames - 8)
+  check(p1.weapon.id == "pistol" and not p1.weapon.fused, "fusione o scambio inattesi")
+  check(#g.items == 1, "l'arma a terra e' sparita")
+end)
+
+test("fusione: un colpo subito la interrompe", function()
+  local g, p1, p2 = fuse_setup("pistol", "flamer")
+  local hit_done = false
+  hold_pickup(g, data.round.fuse_frames + 2, function(i)
+    if i == data.round.tap_frames + 5 and not hit_done then
+      hit_done = true
+      Combat.hit(g, p2, p1, { dmg = 5, kb = 50 })
+    end
+  end)
+  check(not p1.weapon.fused, "la fusione non e' stata interrotta")
+  check(#g.items == 1, "l'arma a terra e' stata consumata")
+end)
+
+test("fusione: durante la fusione si resta fermi", function()
+  local g, p1 = fuse_setup("pistol", "flamer")
+  local x0 = p1.x
+  hold_pickup(g, data.round.fuse_frames - 2, function(i) return { mx = (i > data.round.tap_frames) and 1 or 0 } end)
+  check(math.abs(p1.x - x0) < 3, "il giocatore si e' mosso durante la fusione: " .. (p1.x - x0))
+end)
+
+test("fusione: l'arma fusa riparte con le munizioni al massimo", function()
+  local g, p1 = fuse_setup("pistol", "flamer")
+  p1.weapon.ammo = 1
+  hold_pickup(g, data.round.fuse_frames + 2)
+  check(p1.weapon.ammo == data.weapons.pistol.ammo, "munizioni: " .. tostring(p1.weapon.ammo))
+end)
+
+test("fusione: niente fusione con le mitiche ne' tra armi gia' fuse", function()
+  check(not Fusion.can_fuse({ id = "ghost" }, { id = "pistol" }), "mitica fondibile")
+  check(not Fusion.can_fuse({ id = "pistol" }, { id = "swarm" }), "mitica fondibile come tratto")
+  local f = Fusion.fuse({ id = "pistol" }, { id = "flamer" })
+  check(not Fusion.can_fuse(f, { id = "sword" }), "arma fusa rifondibile")
+  -- tenendo premuto con una mitica a terra si scambia
+  local g, p1 = fuse_setup("pistol", "ghost")
+  hold_pickup(g, data.round.fuse_frames + 2)
+  check(p1.weapon.id == "ghost", "con una mitica tenere premuto dovrebbe scambiare")
+end)
+
+test("fusione: ogni coppia di armi fondibili produce un'arma valida", function()
+  local pairs_, ids = Fusion.all_pairs()
+  check(#ids == 20, "armi fondibili: " .. #ids)
+  local count = 0
+  for _, b in ipairs(ids) do
+    for _, d in ipairs(ids) do
+      local w = Fusion.fuse({ id = b }, { id = d })
+      local def = w.def
+      check(def and def.kind and def.startup and def.recovery, b .. "+" .. d .. ": definizione incompleta")
+      if def.kind == "ranged" then check(def.proj and w.ammo and w.ammo > 0, b .. "+" .. d .. ": senza munizioni") end
+      if def.kind == "melee" then check(def.hit and w.uses and w.uses > 0, b .. "+" .. d .. ": senza colpi") end
+      check(#Fusion.name(w) > 0, b .. "+" .. d .. ": senza nome")
+      count = count + 1
+    end
+  end
+  check(count == 400)
+end)
+
+test("fusione: tutte le armi fuse si usano in partita senza errori", function()
+  local _, ids = Fusion.all_pairs()
+  for _, b in ipairs(ids) do
+    for _, d in ipairs(ids) do
+      local g, p1, p2 = duel(nil, nil, 60)
+      p1.weapon = Fusion.fuse({ id = b }, { id = d })
+      run(g, 70, function(i)
+        return { { attack_pressed = (i % 20 == 1), attack_held = true, ax = 1, ay = (i % 40 < 20) and 0 or -0.4 } }
+      end)
+    end
+  end
+end)
+
+test("tratti: pistola infuocata incendia, spada esplosiva esplode", function()
+  local g, p1, p2 = duel(nil, nil, 120)
+  p1.weapon = Fusion.fuse({ id = "pistol" }, { id = "flamer" })
+  run(g, 40, function(i) pin(p2, p2.x, p2.y); return { { attack_pressed = (i == 1) } } end)
+  check(p2.burn > 0, "la pistola infuocata non incendia")
+  local g2, q1, q2 = duel(nil, nil, 22)
+  q1.weapon = Fusion.fuse({ id = "sword" }, { id = "grenade" })
+  local boom = 0
+  for i = 1, 30 do
+    g2:update({ { attack_pressed = (i == 1) } })
+    for _, e in ipairs(g2:drain_events()) do if e.type == "explosion" then boom = boom + 1 end end
+  end
+  check(boom == 1, "la spada esplosiva non e' esplosa: " .. boom)
+end)
+
+test("tratti: pistola di ritorno torna da chi spara, boomerang potenziato fa piu' danno", function()
+  local f = Fusion.fuse({ id = "pistol" }, { id = "boomerang" })
+  check(f.def.proj.return_after, "i proiettili non tornano")
+  local b = Fusion.fuse({ id = "boomerang" }, { id = "pistol" })
+  check(b.def.damage > data.weapons.boomerang.damage, "il boomerang non fa piu' danno")
+  local s = Fusion.fuse({ id = "sword" }, { id = "boomerang" })
+  check(s.def.kind == "ranged" and s.def.returns and s.ammo == data.weapons.sword.uses, "spada da lancio")
+end)
+
+test("tratti: due armi uguali danno la versione doppia", function()
+  local d = Fusion.fuse({ id = "pistol" }, { id = "pistol" })
+  check(d.def.proj.count == 2, "la doppia pistola non spara due colpi")
+  check(Fusion.name(d) == "Doppia pistola", "nome: " .. Fusion.name(d))
+  local s = Fusion.fuse({ id = "sword" }, { id = "sword" })
+  check(s.def.recovery < data.weapons.sword.recovery, "la doppia spada non e' piu' veloce")
+end)
+
+test("tratti: scudo corazzato para, l'arma in mano con Guardia consuma munizioni", function()
+  local g, p1, p2 = duel(nil, nil, 200)
+  p1.weapon = g:make_weapon("pistol")
+  p2.weapon = Fusion.fuse({ id = "pistol" }, { id = "shield" })
+  p2.facing = -1
+  local ammo = p2.weapon.ammo
+  run(g, 30, function(i) pin(p2, p2.x, p2.y); p2.facing = -1; return { { attack_pressed = (i == 1) } } end)
+  check(p2.hp == 100, "la Guardia non ha parato: " .. p2.hp)
+  check(p2.weapon.ammo == ammo - 1, "la parata non ha consumato munizioni")
+end)
+
 local function random_inputs(rng, n)
   local inputs = {}
   for i = 1, n do

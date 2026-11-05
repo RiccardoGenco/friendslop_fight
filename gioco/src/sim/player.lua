@@ -40,7 +40,7 @@ function Player.new(id, spawn, color)
 end
 
 function Player.weapon_def(p)
-  if p.weapon then return data.weapons[p.weapon.id] end
+  if p.weapon then return p.weapon.def or data.weapons[p.weapon.id] end
   return data.weapons.fists
 end
 
@@ -133,6 +133,7 @@ local function advance_attack(p, game)
       p.vx = p.facing * def.lunge   -- affondo (lancia) o scatto-fendente (katana)
       if def.lunge_invuln then p.invuln = max(p.invuln, def.active + 2) end
     end
+    if a.phase ~= "active" and def.melee_shot then Combat.melee_shot(game, p, a) end
     a.phase = "active"
     if def.kind == "melee" then
       Combat.melee_check(game, p, a)

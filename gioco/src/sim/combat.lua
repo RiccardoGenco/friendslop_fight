@@ -68,8 +68,15 @@ local function land_hit(game, atk, vic, spec)
   if dir == 0 then dir = atk and atk.facing or 1 end
   if spec.pull then dir = -dir end           -- frusta: tira verso chi colpisce
 
+  -- effetti del colpo: uno singolo (armi normali) e/o una lista (armi fuse)
+  local effs = {}
+  if spec.effect then effs[#effs + 1] = spec.effect end
+  if spec.effects then for _, e in ipairs(spec.effects) do effs[#effs + 1] = e end end
+  local has_bubble = false
+  for _, e in ipairs(effs) do if e == "bubble" then has_bubble = true end end
+
   -- un colpo fa scoppiare la bolla, con danno extra (una bolla nuova invece la rinnova)
-  if vic.bubble > 0 and spec.effect ~= "bubble" then
+  if vic.bubble > 0 and not has_bubble then
     vic.bubble = 0
     dmg = dmg + P.bubble_pop_bonus
     game:emit("pop", vic.x, vic.y - 10, { id = vic.id })
@@ -100,24 +107,25 @@ local function land_hit(game, atk, vic, spec)
   end
 
   -- effetti delle armi
-  local eff = spec.effect
-  if eff == "burn" then
-    if vic.burn <= 0 then game:emit("ignite", vic.x, vic.y - 10, { id = vic.id }) end
-    vic.burn = P.burn_frames
-    vic.burn_by = atk and atk.id or nil
-  elseif eff == "bubble" then
-    vic.bubble = P.bubble_frames
-    vic.action, vic.grapple = nil, nil
-    vic.vx, vic.vy = vic.vx * 0.3, 0
-    game:emit("bubbled", vic.x, vic.y - 10, { id = vic.id })
-  elseif eff == "hookpull" and atk and atk.alive and atk.id ~= vic.id then
-    -- rampino: trascina la vittima verso chi ha sparato
-    local dx, dy = atk.x - vic.x, (atk.y - 6) - vic.y
-    local d = sqrt(dx * dx + dy * dy) + 0.001
-    vic.vx = dx / d * P.hook_pull_speed
-    vic.vy = dy / d * P.hook_pull_speed - 120
-    vic.hitstun = P.hook_stun
-    vic.grounded = false
+  for _, eff in ipairs(effs) do
+    if eff == "burn" then
+      if vic.burn <= 0 then game:emit("ignite", vic.x, vic.y - 10, { id = vic.id }) end
+      vic.burn = P.burn_frames
+      vic.burn_by = atk and atk.id or nil
+    elseif eff == "bubble" then
+      vic.bubble = P.bubble_frames
+      vic.action, vic.grapple, vic.fusing = nil, nil, nil
+      vic.vx, vic.vy = vic.vx * 0.3, 0
+      game:emit("bubbled", vic.x, vic.y - 10, { id = vic.id })
+    elseif eff == "hookpull" and atk and atk.alive and atk.id ~= vic.id then
+      -- rampino: trascina la vittima verso chi ha sparato
+      local dx, dy = atk.x - vic.x, (atk.y - 6) - vic.y
+      local d = sqrt(dx * dx + dy * dy) + 0.001
+      vic.vx = dx / d * P.hook_pull_speed
+      vic.vy = dy / d * P.hook_pull_speed - 120
+      vic.hitstun = P.hook_stun
+      vic.grounded = false
+    end
   end
 
   local stop = math.floor(min(P.hitstop_max, P.hitstop_base + dmg * 0.04))
@@ -193,7 +201,8 @@ end
 local function shield_block(game, atk, vic, spec)
   local P = data.player
   local w = vic.weapon
-  w.uses = w.uses - (spec.guardbreak and 3 or 1)
+  local cost = spec.guardbreak and 3 or 1
+  if w.uses then w.uses = w.uses - cost elseif w.ammo then w.ammo = w.ammo - cost end
   local dir = sign(vic.x - (spec.src_x or (atk and atk.x) or vic.x))
   if dir == 0 then dir = -vic.facing end
   vic.vx = dir * P.shield_block_push * (spec.guardbreak and 2 or 1)
@@ -203,7 +212,7 @@ local function shield_block(game, atk, vic, spec)
     atk.vx = -dir * P.shield_block_push
   end
   game:emit("block", vic.x + vic.facing * 8, vic.y - 12, { id = vic.id })
-  if w.uses <= 0 then
+  if (w.uses or w.ammo or 1) <= 0 then
     game:emit("break", vic.x, vic.y - 12, { weapon = w.id })
     vic.weapon = nil
   end
@@ -215,7 +224,8 @@ function Combat.hit(game, atk, vic, spec)
   if not vic.alive or vic.invuln > 0 then return "miss" end
   local a = vic.action
   -- scudo in mano e non si sta attaccando: para tutto cio' che arriva da davanti
-  if vic.weapon and vic.weapon.id == "shield" and not (a and a.type == "attack")
+  local vdef = vic.weapon and (vic.weapon.def or data.weapons[vic.weapon.id])
+  if vdef and (vdef.id == "shield" or vdef.guard) and not (a and a.type == "attack")
      and vic.hitstun <= 0 and vic.bubble <= 0 then
     local sx = spec.src_x or (atk and atk.x) or vic.x
     if (sx - vic.x) * vic.facing > -2 then
@@ -288,8 +298,12 @@ function Combat.melee_check(game, p, a)
           dmg = def.damage * a.mul,
           kb = def.knockback * a.kmul,
           guardbreak = def.guardbreak,
-          melee = true,
+          melee = true, effects = def.effects,
         })
+        if (res == "hit" or res == "kill") and def.on_hit_blast then
+          -- tratto Esplosivo su un'arma da mischia: il colpo esplode dove arriva
+          Combat.explode(game, t.x, t.y - t.h / 2, def.on_hit_blast, p, def.id)
+        end
         if res == "parried" or res == "blocked" then return end
       end
     end
@@ -344,6 +358,7 @@ function Combat.fire(game, p, a)
     props.wid, props.dmg, props.kb = def.id, def.damage * a.mul, def.knockback * a.kmul
     props.color, props.blast, props.field = def.color, blast, def.field
     props.kind = pj.kind or "bullet"
+    props.guardbreak = def.guardbreak
     if def.returns then
       -- boomerang e rampino: un solo colpo in volo alla volta
       props.wref = w
@@ -354,7 +369,35 @@ function Combat.fire(game, p, a)
   if def.recoil then
     p.vx = p.vx - ax * def.recoil
   end
+  if def.fire_dash then
+    -- tratto Scatto: ogni colpo ti spinge in avanti, con una breve invulnerabilita'
+    p.vx = ax * def.fire_dash
+    if ay < -0.5 then p.vy = math.min(p.vy, ay * def.fire_dash * 0.8) end
+    p.invuln = max(p.invuln, 8)
+  end
   game:emit("shoot", mx, my, { weapon = def.id, id = p.id })
+end
+
+-- Proiettile extra di un'arma da mischia fusa (tratti Calibro, Rosa, Aggancio, Trappola)
+function Combat.melee_shot(game, p, a)
+  local s = a.def.melee_shot
+  local ax, ay = p.aimx, p.aimy
+  if not p.aim_free then ax, ay = p.facing, 0 end
+  if s.dir == "down" then ax, ay = p.facing * 0.3, 0.6 end
+  local len = sqrt(ax * ax + ay * ay)
+  ax, ay = ax / len, ay / len
+  local base = math.atan2 and math.atan2(ay, ax) or math.atan(ay, ax)
+  local mx, my = p.x + ax * (p.w / 2 + 4), p.y - 12 + ay * 4
+  for i = 1, s.count or 1 do
+    local ang = base
+    if (s.count or 1) > 1 then ang = base + ((i - 1) / (s.count - 1) * 2 - 1) * s.spread end
+    local props = {}
+    for k, v in pairs(s) do props[k] = v end
+    props.wid, props.color = a.def.id, a.def.color
+    props.kind = s.kind or "bullet"
+    Combat.new_projectile(game, p.id, mx, my, math.cos(ang) * s.speed, math.sin(ang) * s.speed, props)
+  end
+  game:emit("shoot", mx, my, { weapon = (s.kind == "hook") and "hook" or "pistol", id = p.id })
 end
 
 function Combat.throw_weapon(game, p)
@@ -400,7 +443,7 @@ local function projectile_vs_players(game, pr)
       local hx1, hy1, hx2, hy2 = hurtbox(t)
       if overlap(x1, y1, x2, y2, hx1, hy1, hx2, hy2) then
         local own = (t.id == pr.owner)
-        if pr.kind == "boomerang" and own then
+        if pr.return_after and own then
           -- il boomerang che torna viene ripreso al volo
           if pr.returning then return "catch" end
           goto continue
@@ -418,7 +461,7 @@ local function projectile_vs_players(game, pr)
         do
           local res = Combat.hit(game, shooter, t, {
             wid = pr.wid, dmg = pr.dmg, kb = pr.kb, proj = pr, src_x = pr.x - sign(pr.vx) * 4,
-            effect = pr.effect, nostun = pr.nostun,
+            effect = pr.effect, effects = pr.effects, nostun = pr.nostun, guardbreak = pr.guardbreak,
           })
           if res == "parried" then return "parried" end
           if res == "blocked" then return "remove" end
@@ -471,7 +514,7 @@ local function guide(game, pr, dt)
       pr.vx, pr.vy = pr.vx * k, pr.vy * k
     end
   end
-  if pr.kind == "boomerang" and pr.age > pr.return_after then
+  if pr.return_after and pr.age > pr.return_after then
     local o = game.players[pr.owner]
     if not pr.returning then
       pr.returning = true
