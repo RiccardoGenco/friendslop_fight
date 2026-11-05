@@ -17,7 +17,7 @@ Per ogni caratteristica: com'è adesso, cosa migliorare, cosa si fa. Ordine = or
 | 11 | Bot | Un livello solo, prevedibili | Da soli ci si annoia presto o si perde sempre | Tre livelli (facile, normale, difficile) scelti nella lobby: mira, riflessi, parry, schivate dei proiettili |
 | 12 | Vibrazione | Assente | Il feedback fisico in un picchiaduro conta molto | Vibrazione del controller su colpo subito, morte, esplosione vicina; interruttore nelle impostazioni |
 | 13 | Musica in partita | La musica sfuma all'inizio del round | In partita c'è silenzio sotto gli effetti | Brano di combattimento a parte, più veloce durante la morte improvvisa |
-| 14 | Progressione | 10 obiettivi, monete, skin | Le novità non hanno obiettivi propri | Nuovi obiettivi: vincere contro bot difficili, sopravvivere agli eventi di mappa, eliminare con la lava |
+| 14 | Progressione | 10 obiettivi, monete, skin | Le novità non hanno obiettivi propri | Nuovi obiettivi: vincere contro bot difficili, restare in vita durante gli eventi di mappa, vincere un round senza subire danni |
 
 ## Stato
 Tutti i 14 punti sono fatti (v0.8). Ogni punto e' stato chiuso con: modifica, test della simulazione
