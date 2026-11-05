@@ -20,7 +20,10 @@ love = {
   graphics = stub({
     getDimensions = function() return 1280, 720 end,
     getWidth = function() return 1280 end, getHeight = function() return 720 end,
-    newFont = function() return dummy() end, newCanvas = function() return dummy() end,
+    newFont = function()
+      return setmetatable({ getWidth = function() return 8 end, getHeight = function() return 8 end },
+                          { __index = dummy() })
+    end, newCanvas = function() return dummy() end,
   }),
   keyboard = stub({ isDown = function() return false end }),
   mouse = stub({ getPosition = function() return mouse_x, mouse_y end, isDown = function() return false end }),
@@ -43,6 +46,15 @@ for _, k in ipairs({ "down", "return", "right", "down", "return", "left", "up", 
                      "down", "return", "down", "escape", "up", "up" }) do
   key(k); frame()
 end
+-- mouse nei menu: passa sopra e clicca, rotella negli obiettivi
+for _, pt in ipairs({ { 640, 330 }, { 640, 400 }, { 100, 100 } }) do
+  love.mousemoved(pt[1], pt[2]); frame()
+end
+key("down"); key("return"); frame()                 -- personaggi
+love.mousemoved(900, 500); love.mousepressed(900, 500, 1); frame()
+love.mousepressed(60, 30, 1); frame()               -- indietro
+key("down"); key("return"); frame(); love.wheelmoved(0, -1); frame(); key("escape")
+key("up"); key("up")
 for _ = 1, 30 do frame() end
 key("return")
 key("f1")

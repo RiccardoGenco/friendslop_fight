@@ -62,6 +62,7 @@ local function new_seed()
 end
 
 local ensure_loadouts
+local menu_press_result
 
 local function is_human(id)
   local s = Input.slots[id]
@@ -136,25 +137,29 @@ function ensure_loadouts()
 end
 
 local function lobby_slot_press(s, b)
-  if not s or s.kind == "bot" then return end
+  if not s or s.kind == "bot" or b == "ok" or b == "back" then return end
+  Audio.play("ui_move", (b == "left" or b == "right") and 0.9 or 1.1, 0.7)
   if b == "left" then cycle_hero(s, -1) elseif b == "right" then cycle_hero(s, 1)
   elseif b == "up" then cycle_skin(s, -1) elseif b == "down" then cycle_skin(s, 1) end
 end
 
 local function to_menu()
+  Audio.play("ui_back", 1, 0.7)
   state = "menu"
   Menu.open("main")
 end
 
-local function menu_press(b)
-  local r = Menu.press(b)
+function menu_press_result(r)
   if r == "play" then
     state = "lobby"
+    Audio.play("ui_join", 1, 0.7)
     Input.clear_pending()
   elseif r == "quit" then
     love.event.quit()
   end
 end
+
+local function menu_press(b) menu_press_result(Menu.press(b)) end
 
 -- levetta sinistra nei menu: un passo per ogni spinta
 local stick_prev = {}
@@ -225,6 +230,7 @@ function love.update(dt)
   Debug.update(dt)
   Profile.update(dt)
   Menu.update(dt)
+  Audio.update_music(dt, state == "menu" or state == "lobby" or state == "matchend")
   poll_menu_sticks()
 
   if state == "menu" then
@@ -369,6 +375,13 @@ function love.draw()
   lg.scale(Render.SS)
   if state == "menu" then
     Menu.draw(time)
+    if Input.mouse.active then
+      local x, y = (Input.mouse.x - screen.ox) / screen.s, (Input.mouse.y - screen.oy) / screen.s
+      lg.setColor(0, 0, 0, 0.8)
+      lg.polygon("fill", x - 1, y - 1, x + 9, y + 8, x + 4, y + 9, x + 1, y + 13)
+      lg.setColor(1, 0.95, 0.85)
+      lg.polygon("fill", x, y, x + 7, y + 7, x + 3, y + 7, x + 1, y + 11)
+    end
   elseif state == "lobby" then
     draw_lobby()
   elseif game then
@@ -401,14 +414,29 @@ end
 -- ---------------------------------------------------------------------------
 -- Eventi
 
+local function to_virtual(x, y)
+  return (x - screen.ox) / screen.s, (y - screen.oy) / screen.s
+end
+
 function love.mousemoved(x, y)
   Input.mouse.x, Input.mouse.y = x, y
   Input.mouse.active = true
+  if state == "menu" then Menu.pointer(to_virtual(x, y)) end
+end
+
+function love.wheelmoved(_, dy)
+  if state == "menu" and dy ~= 0 then Menu.wheel(dy) end
 end
 
 function love.mousepressed(x, y, button)
   Input.mouse.x, Input.mouse.y = x, y
   Input.mouse.active = true
+  if state == "menu" then
+    local vx, vy = to_virtual(x, y)
+    local r = Menu.click(vx, vy, button)
+    if r == "play" then menu_press_result("play") elseif r == "quit" then love.event.quit() end
+    return
+  end
   Input.mouse_button(button)
 end
 
@@ -441,7 +469,7 @@ function love.joystickpressed(joy, button)
     if not Input.has_joystick(joy) then
       if joy:isGamepad() then
         local s = Input.add_joystick(joy)
-        if s then s.join_t = time end
+        if s then s.join_t = time; Audio.play("ui_join", 1, 0.7) end
         menu_msg = nil
       else
         menu_msg = "Controller non riconosciuto come gamepad standard (SDL)"
@@ -476,6 +504,7 @@ function love.keypressed(key)
       if sl.kb == 1 and kb1[key] then lobby_slot_press(sl, kb1[key]) end
       if sl.kb == 2 and kb2[key] then lobby_slot_press(sl, kb2[key]) end
     end
+    if key == "f1" or key == "f2" or key == "f10" then Audio.play("ui_join", 1, 0.7) end
     if key == "f1" then Input.add_keyboard(1)
     elseif key == "f2" then Input.add_keyboard(2)
     elseif key == "f10" then Input.add_bot()

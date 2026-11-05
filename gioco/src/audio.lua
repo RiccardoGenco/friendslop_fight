@@ -48,8 +48,81 @@ function Audio.load()
     s.ricochet = make(1400, 0.07, "sine", 0.18, -700)
     s.explosion = make(0, 0.45, "square", 0.40, 0, true)
     s.sniper = make(90, 0.25, "saw", 0.35, -60)
+    -- interfaccia
+    s.ui_move = make(1200, 0.04, "square", 0.08, 300)
+    s.ui_ok = Audio.notes({ 660, 990 }, 0.06, "square", 0.14)
+    s.ui_back = Audio.notes({ 700, 440 }, 0.06, "square", 0.12)
+    s.ui_error = make(110, 0.18, "saw", 0.22, -30)
+    s.ui_coin = Audio.notes({ 988, 1319, 1760 }, 0.05, "square", 0.13)
+    s.ui_unlock = Audio.notes({ 523, 659, 784, 1047 }, 0.09, "square", 0.15)
+    s.ui_join = Audio.notes({ 392, 587 }, 0.07, "square", 0.14)
   end)
   Audio.enabled = ok
+  pcall(Audio.load_music)
+end
+
+-- breve sequenza di note (pling dei menu)
+function Audio.notes(freqs, each, wave, vol)
+  local per = math.floor(RATE * each)
+  local sd = love.sound.newSoundData(per * #freqs, RATE, 16, 1)
+  for k, fq in ipairs(freqs) do
+    local phase = 0
+    for i = 0, per - 1 do
+      local t = i / per
+      phase = phase + fq / RATE
+      local v = (wave == "square") and ((phase % 1 < 0.5) and 1 or -1) or math.sin(phase * 2 * math.pi)
+      local env = (k == #freqs) and (1 - t) * (1 - t) or (1 - 0.4 * t)
+      sd:setSample((k - 1) * per + i, v * vol * env)
+    end
+  end
+  return love.audio.newSource(sd, "static")
+end
+
+-- musica dei menu: giro di quattro accordi (La- Fa Do Sol) con basso e arpeggio, in loop
+function Audio.load_music()
+  local bpm = 112
+  local eighth = 60 / bpm / 2
+  local chords = { { 220, 261.6, 329.6 }, { 174.6, 220, 261.6 }, { 130.8, 164.8, 196 }, { 196, 246.9, 293.7 } }
+  local per = math.floor(RATE * eighth)
+  local n = per * 8 * #chords * 2
+  local sd = love.sound.newSoundData(n, RATE, 16, 1)
+  local i = 0
+  for rep = 1, 2 do
+    for c, ch in ipairs(chords) do
+      for step = 0, 7 do
+        local arp = ch[(step % 3) + 1] * ((step >= 4) and 2 or 1) * ((rep == 2 and step % 2 == 1) and 2 or 1)
+        local bass = ch[1] / 2
+        for j = 0, per - 1 do
+          local t = j / per
+          local tt = i / RATE
+          local a = ((tt * arp) % 1 < 0.25) and 1 or -1                      -- impulso stretto, suono chiptune
+          local b = 1 - 4 * math.abs(((tt * bass) % 1) - 0.5)                 -- triangolo
+          local v = a * 0.05 * (1 - t) ^ 1.5 + b * 0.10 * ((step % 2 == 0) and (1 - 0.5 * t) or 0.6)
+          if step % 4 == 2 then v = v + (love.math.random() * 2 - 1) * 0.04 * (1 - t) ^ 6 end   -- charleston
+          sd:setSample(i, v)
+          i = i + 1
+        end
+      end
+    end
+  end
+  Audio.music = love.audio.newSource(sd, "static")
+  Audio.music:setLooping(true)
+  Audio.music:setVolume(0)
+  Audio.music_vol = 0
+end
+
+-- da chiamare ogni frame: la musica sale nei menu e sfuma in partita
+function Audio.update_music(dt, on)
+  local m = Audio.music
+  if not m or not Audio.enabled then return end
+  local target = on and 0.55 or 0
+  Audio.music_vol = Audio.music_vol + (target - Audio.music_vol) * math.min(1, dt * 2)
+  if Audio.music_vol > 0.01 then
+    if not m:isPlaying() then m:play() end
+    m:setVolume(Audio.music_vol)
+  elseif m:isPlaying() then
+    m:pause()
+  end
 end
 
 function Audio.play(name, pitch, volume)
