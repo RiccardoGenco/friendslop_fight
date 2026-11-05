@@ -134,7 +134,21 @@ function Fx.track(game)
         Fx.burst(p.x, p.y, { 0.75, 0.75, 0.8 }, 3 + math.floor(s.vy / 140), 70, 0.25, 40, 1)
       end
       s.gy, s.vy = p.grounded, p.vy
-      if p.grounded then s.dist = (s.dist or 0) + math.abs(p.vx) / 60 end
+      if p.grounded then
+        local before = s.dist or 0
+        s.dist = before + math.abs(p.vx) / 60
+        -- un passo ogni ~19 px percorsi (stesso ritmo delle gambe)
+        if math.abs(p.vx) > 50 and math.floor(s.dist / 18.85) ~= math.floor(before / 18.85) then
+          Fx.burst(p.x - p.vx * 0.02, p.y - 1, { 0.75, 0.72, 0.7 }, 2, 25, 0.25, -30, 1)
+        end
+        -- sgommata: si corre in un verso guardando nell'altro (inversione di marcia)
+        if math.abs(p.vx) > 70 and p.facing * p.vx < 0 and game.frame % 3 == 0 then
+          Fx.spray(p.x, p.y - 1, p.vx > 0 and 1 or -1, { 0.85, 0.8, 0.75 }, 2, 90, 0.2)
+        end
+      end
+      if p.sliding and game.frame % 4 == 0 then
+        Fx.burst(p.x + p.wall * 5, p.y - 16, { 1, 0.85, 0.5 }, 1, 30, 0.2, 200, 1)
+      end
       if p.action and p.action.type == "dash" and game.frame % 2 == 0 then
         Fx.ghosts[#Fx.ghosts + 1] = { x = p.x, y = p.y, color = p.color, life = 0.18, max = 0.18 }
       end

@@ -11,7 +11,7 @@ local Look = require("src.look")
 
 local lg = love.graphics
 local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
-local floor, sin, cos, min, max = math.floor, math.sin, math.cos, math.min, math.max
+local floor, sin, cos, min, max, abs = math.floor, math.sin, math.cos, math.min, math.max, math.abs
 
 local Render = { W = 640, H = 360, SS = 2 }
 
@@ -336,8 +336,58 @@ local function draw_held_weapon(p, game)
   -- effetto del colpo in mischia
   if a and a.type == "attack" and a.phase == "active" and def.kind == "melee" then
     local x1, y1, x2, y2 = Combat.melee_rect(p, def)
-    lg.setColor(1, 1, 1, 0.28)
-    lg.rectangle("fill", x1, y1, x2 - x1, y2 - y1)
+    local f = p.facing
+    local cx, cy = p.x, p.y - 11
+    local reach = max(abs(x1 - cx), abs(x2 - cx))
+    local k = min(1, (a.frame - a.startup) / max(1, def.active))
+    local col = def.color or { 1, 1, 1 }
+    local heavy = (def.damage or 10) >= 25
+    lg.setBlendMode("add")
+    if def.id == "spear" or (y2 - y1) <= 10 then
+      -- affondo: striscia che si allunga in avanti
+      local len = reach * (0.5 + 0.5 * k)
+      for j = 0, 2 do
+        lg.setColor(col[1], col[2], col[3], 0.55 - j * 0.15)
+        lg.polygon("fill", cx + f * 6, cy - 3 + j, cx + f * len, cy, cx + f * 6, cy + 3 - j)
+      end
+      lg.setColor(1, 1, 1, 0.8)
+      lg.rectangle("fill", cx + f * (len - 3) - 1.5, cy - 1, 3, 2)
+    else
+      -- fendente: mezzaluna che spazza dall'alto in avanti
+      local a0 = -1.35
+      local a1 = a0 + (heavy and 2.9 or 2.5) * min(1, 0.35 + k)
+      local rin = reach * 0.45
+      local n = 10
+      for layer = 1, 2 do
+        local ro = reach * (layer == 1 and 1 or 0.85)
+        lg.setColor(col[1], col[2], col[3], (layer == 1 and 0.35 or 0.55) * (1 - 0.6 * k))
+        local poly = {}
+        for i = 0, n do
+          local t = a0 + (a1 - a0) * i / n
+          poly[#poly + 1] = cx + f * cos(t) * ro
+          poly[#poly + 1] = cy + sin(t) * ro
+        end
+        for i = n, 0, -1 do
+          local t = a0 + (a1 - a0) * i / n
+          local r2 = rin + (ro - rin) * (1 - i / n) * 0.6
+          poly[#poly + 1] = cx + f * cos(t) * r2
+          poly[#poly + 1] = cy + sin(t) * r2
+        end
+        local ok = pcall(lg.polygon, "fill", poly)
+        if not ok then lg.circle("fill", cx + f * reach * 0.6, cy, reach * 0.4) end
+      end
+      lg.setColor(1, 1, 1, 0.9 * (1 - k))
+      lg.setLineWidth(heavy and 2 or 1)
+      local pts = {}
+      for i = 0, n do
+        local t = a0 + (a1 - a0) * i / n
+        pts[#pts + 1] = cx + f * cos(t) * reach
+        pts[#pts + 1] = cy + sin(t) * reach
+      end
+      lg.line(pts)
+      lg.setLineWidth(1)
+    end
+    lg.setBlendMode("alpha")
   end
 end
 
@@ -468,6 +518,35 @@ local function draw_items(game, time)
     local r = data.tiers[it.weapon.tier or 1]
     local bob = floor(sin(time * 4 + it.id) * 1.5)
     local blink = it.life < 120 and (floor(time * 10) % 2 == 0)
+    local tier = it.weapon.tier or 1
+    local c = r.color
+    local gx, gy = floor(it.x), floor(it.y)
+    -- piedistallo luminoso e, per le armi forti, fascio di luce visibile da lontano
+    lg.setBlendMode("add")
+    lg.setColor(c[1], c[2], c[3], 0.25 + 0.1 * sin(time * 5))
+    lg.ellipse("fill", gx, gy, 10, 3)
+    if tier >= 3 then
+      local hgt = tier == 4 and 120 or 70
+      for j = 0, 5 do
+        lg.setColor(c[1], c[2], c[3], (tier == 4 and 0.10 or 0.07) * (1 - j / 6))
+        lg.rectangle("fill", gx - 5 + j * 0.5, gy - j * hgt / 6 - hgt / 6, 10 - j, hgt / 6)
+      end
+      if tier == 4 then
+        for j = 1, 4 do
+          local ph = (time * 0.8 + j * 0.25) % 1
+          lg.setColor(1, 0.95, 0.6, 1 - ph)
+          lg.rectangle("fill", gx - 8 + (j * 5) % 16, gy - 4 - ph * 30, 1, 1)
+        end
+      end
+    end
+    lg.setBlendMode("alpha")
+    -- nome dell'arma quando un giocatore e' vicino
+    for _, p in ipairs(game.players) do
+      if p.alive and abs(p.x - it.x) < 40 and abs(p.y - it.y) < 30 then
+        Render.text(def.short or def.name, gx, gy - 26 + bob, { c[1], c[2], c[3] }, "small", "center", 80)
+        break
+      end
+    end
     if not blink then
       local x, y = floor(it.x), floor(it.y) + bob
       lg.setColor(r.color[1], r.color[2], r.color[3], 0.35 + 0.2 * sin(time * 6))
@@ -613,8 +692,14 @@ local function draw_projectiles(game, time)
       lg.setColor(0.95, 0.9, 1, 0.85)
       lg.circle("fill", pr.x, pr.y, 2.5)
     else
-      lg.setColor(col[1], col[2], col[3], 0.35)
-      lg.rectangle("fill", pr.x - pr.vx * 0.02 - pr.w / 2, pr.y - pr.vy * 0.02 - pr.h / 2, pr.w, pr.h)
+      lg.setBlendMode("add")
+      lg.setColor(col[1], col[2], col[3], 0.45)
+      lg.setLineWidth(max(1, min(pr.w, pr.h)))
+      lg.line(pr.x - pr.vx * 0.04, pr.y - pr.vy * 0.04, pr.x, pr.y)
+      lg.setLineWidth(1)
+      lg.setColor(col[1], col[2], col[3], 0.18)
+      lg.circle("fill", pr.x, pr.y, max(pr.w, pr.h) + 2)
+      lg.setBlendMode("alpha")
       lg.setColor(1, 1, 0.85)
       lg.rectangle("fill", pr.x - pr.w / 2, pr.y - pr.h / 2, pr.w, pr.h)
       if pr.reflected then
