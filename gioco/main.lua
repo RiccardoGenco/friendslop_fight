@@ -56,6 +56,10 @@ function love.load(args)
   Profile.load()
   Menu.apply_settings()
   love.mouse.setVisible(false)
+  if args and args[1] == "shot" then
+    __shot = require("src.shot")
+    __shot.start(args)
+  end
 end
 
 -- accesso alla partita per la prova a secco (tests/smoke_love.lua)
@@ -102,7 +106,7 @@ end
 
 local function start_game()
   ensure_loadouts()
-  game = Game.new({ players = Input.count(), seed = new_seed() })
+  game = Game.new({ players = Input.count(), seed = new_seed(), maps = __force_maps })
   Look.loadout = {}
   for i, s in ipairs(Input.slots) do Look.loadout[i] = { hero = s.hero, skin = s.skin } end
   local has_bot = false
@@ -267,6 +271,7 @@ end
 -- ---------------------------------------------------------------------------
 
 function love.update(dt)
+  if __shot then __shot.update(); dt = 1 / 60 end
   dt = math.min(dt, 0.1)
   time = time + dt
   Input.poll()
@@ -523,6 +528,7 @@ function love.draw()
   lg.clear(0, 0, 0, 1)
   lg.setColor(1, 1, 1, 1)
   lg.draw(canvas, ox, oy, 0, s, s)
+  if __shot then __shot.after_draw(canvas) end
 end
 
 -- ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.9)
+# Friendslop Fight (prototipo v0.10)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -9,6 +9,7 @@ Altrimenti installa LÖVE 11.5 (love2d.org) e dalla cartella del progetto lancia
 Test della simulazione: `love . test` (oppure `luajit tests/run.lua`).
 Prova a secco della grafica con i bot: `luajit tests/smoke_love.lua`.
 Ritmo e bilanciamento con partite tra bot: `luajit tests/balance.lua [partite] [giocatori]`.
+Foto del gioco per controllare la grafica: `love . shot <scena> <cartella> [mappa]` (scene: gallery, menu, heroes, lobby, game, pause, matchend). `gallery` mette su un'unica immagine eroi in tutte le pose, armi ed effetti.
 
 ## Menu principale
 All'avvio: Gioca, Personaggi, Obiettivi, Esci. Frecce/WASD o croce/levetta per muoversi, Invio/A per scegliere, Esc/B per tornare. Funziona anche col mouse (click, tasto destro per tornare, rotella per scorrere).

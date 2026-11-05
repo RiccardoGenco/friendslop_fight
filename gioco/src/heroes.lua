@@ -26,19 +26,24 @@ Heroes.list = {
     id = "gatto", name = "Micio Kage", title = "Gatto ninja", price = 0, tail = "cat",
     knot = "B",   -- nodo della fascia che svolazza dietro la testa
     head = {
-      ".OO......OO...",
-      ".OFO....OFFO..",
-      ".OFFOOOOOFFO..",
-      "OFFFFFFFFFFFO.",
-      "OAAAAAAAAAAAAO",
-      "OaAAAAAAAAAAAO",
-      "OFFFFFFWWFFFO.",
-      "OFFFFFFWEFFFFO",
-      "OFFFFFFFFLLLNO",
-      "OfFFFFFLLLLLO.",
-      ".OfFFFFFLLLO..",
-      "..OOfffffOO...",
-      "....OOOOO.....",
+      "....OO............OO....",
+      "...OHFO..........OFFO...",
+      "...OFNFO........OFNFO...",
+      "..OFFNNFOOOOOOOOFNNFFO..",
+      "..OHHFFFFHHHHFFFFFFFFO..",
+      ".OAAAAAAAAAAAAAAAAAAAAO.",
+      ".OaAAAAAAAAAAAAAAAAAAAAO",
+      ".OaaaaaaaaaaaaaaaaaaaaO.",
+      ".OfFFFfFFFFFFFFWWWWFFFO.",
+      "OfFFFFFfFFFFFFWWWEEWFFFO",
+      "OfFfFFFFFFFFFFWWWEEWFFFO",
+      "OfFFfFFFFFFFFFFWWWWFFLLO",
+      "OfFFFFFFFFFFFFFFFFFLLLNO",
+      "OffFFfFFFFFFFFFFFFLLLLLO",
+      ".OffFFFFFFFFFFFFFLLOOLO.",
+      ".OfffFFFFFFFFFFFFLLLLLO.",
+      "..OOfffffffffffffffOO...",
+      "....OOOOOOOOOOOOOOO.....",
     },
     skins = {
       { name = "Tigrato", pal = pal{ F = "e8913a", f = "b0602a", L = "f6dcb4", W = "ffffff", E = "1b2a1a",
@@ -52,19 +57,26 @@ Heroes.list = {
   {
     id = "rana", name = "Ranocchio Taro", title = "Rana samurai", price = 0, tail = "none",
     head = {
-      "...A......A...",
-      "...AA....AA...",
-      "....AMMMMA....",
-      "..OMMMMMMMMO..",
-      ".OMmMMMMMMmMO.",
-      "OmmmmmmmmmmmmO",
-      ".OFFFFFFWWWFO.",
-      ".OFFFFFWWEEWO.",
-      "OFFFFFFFWWWFFO",
-      "OFFFFFFFFFFFFO",
-      "OfLLLLLLLLLLNO",
-      ".OfLLLLLLLLLO.",
-      "..OOOOOOOOOO..",
+      ".....A............A.....",
+      ".....AA..........AA.....",
+      "......AA........AA......",
+      ".......AAyMMMMyAA.......",
+      "....OOMMMMMMMMMMMMOO....",
+      "..OOMMMMMMMMMMMMMMMMOO..",
+      ".OmMMMMMMMMMMMMMMMMMMmO.",
+      "OmmmmmmmmmmmmmmmmmmmmmmO",
+      ".OOFFFFFFFFFFFFOOOOOOO..",
+      "..OFFFFFFFFFFFOWWWWWWO..",
+      ".OHFFFFFFFFFFFOWWWWEEWO.",
+      ".OFFFFFFFFFFFFOWWWWEEWO.",
+      "OFFFFFFFFFFFFFFOWWWWWO..",
+      "OfFFFFFFFFFFFFFFOOOOOFO.",
+      "OfFFFFFFFFFFFFFFFFFFFFFO",
+      "OfLLLLLLLLLLLLLLLLLLOOOO",
+      "OffLLLLLLLLLLLLLLLLLLLO.",
+      ".OffLLLLLLLLLLLLLLLLLO..",
+      "..OOffffLLLLLLLLLLLOO...",
+      "....OOOOOOOOOOOOOOO.....",
     },
     skins = {
       { name = "Stagno", pal = pal{ F = "5fbf4a", f = "3a8a32", L = "d8eaa0", W = "ffffff", E = "111111",
@@ -78,19 +90,25 @@ Heroes.list = {
   {
     id = "orso", name = "Orso Barbanera", title = "Orso pirata", price = 0, tail = "bear",
     head = {
-      "....OAAAAO....",
-      "..OAAAWWAAAO..",
-      ".OAAAAWWAAAAO.",
-      "OaaaaaaaaaaaaO",
-      ".OFFFFFFFFFFO.",
-      "OFFFFFOOOOOFFO",
-      "OFFFFFFFOOOFFO",
-      "OFFFFFFFFOFFFO",
-      "OFFFFFFFLLLLO.",
-      "OfFFFFFLLLLNNO",
-      ".OfFFFFFLLLLO.",
-      "..OOffffffOO..",
-      "....OOOOOO....",
+      "........OOOOOOOO........",
+      "......OOAAAAAAAAOO......",
+      "....OOAAAAAAWWAAAAOO....",
+      "...OAAAAAAAWWWWAAAAAO...",
+      "..OAAAAAAAAWkWkAAAAAAO..",
+      ".OAAAAAAAAAAWWAAAAAAAAO.",
+      "OaaaaaaaaaaaaaaaaaaaaaaO",
+      ".OOOFFFFFFFFFFFFFFFFOOO.",
+      "..OFHHFFFFFFFFFFFFFFFO..",
+      ".OfFFFFFFFFkkkkkkkFFFFO.",
+      ".OfFFFFFFFFFFFFkkkkFFFO.",
+      ".OfFFFFFFFFFFFFkkkkFFFO.",
+      ".OfFFFFFFFFFFFFFkkLLLLO.",
+      ".OfFFFFFFFFFFFFFLLLLNNNO",
+      ".OffFFFFFFFFFFFLLLLLNNNO",
+      "..OffFFFFFFFFFFLLOOLLLO.",
+      "..OfffFFFFFFFFFFLLLLLO..",
+      "...OOfffffffffffffOO....",
+      ".....OOOOOOOOOOOOOO.....",
     },
     skins = {
       { name = "Bruno", pal = pal{ F = "8a5a34", f = "5e3b22", L = "d4a878", W = "f4f0e6", E = "111111",
@@ -104,19 +122,24 @@ Heroes.list = {
   {
     id = "volpe", name = "Volpe Dakota", title = "Volpe cowboy", price = 250, tail = "fox",
     head = {
-      ".....OAAAO....",
-      "....OAAAAAO...",
-      "...OaaaaaaaO..",
-      "OAAAAAAAAAAAAO",
-      ".OOFFFFFFFOO..",
-      ".OFFFFFFWWFO..",
-      ".OFFFFFFWEFFO.",
-      ".OFFFFFFFFFFFO",
-      ".OfFFFFFLLLLNO",
-      "..OfFFLLLLLOO.",
-      "..OBBBBBBBO...",
-      "...ObbBbbO....",
-      "....OOOO......",
+      "........OOOOOO..........",
+      ".......OAAAAAAO.........",
+      "......OAAAAAAAAO........",
+      "......ObbbbbbbbbO.......",
+      "..OOOOAAAAAAAAAAAOOOOO..",
+      ".OaAAAAAAAAAAAAAAAAAAaO.",
+      "..OOOFFFFFFFFFFFFFOOOO..",
+      "...OFHHFFFFFFFFFFFFO....",
+      "..OfFFFFFFFFFFWWWFFFO...",
+      "..OfFFFFFFFFFWWWEEFFFO..",
+      "..OfFFFFFFFFFFWWEEFFFFOO",
+      "..OfFFFFFFFFFFFFFFFLLLNO",
+      "..OffFFFFFFFFFFFLLLLLLOO",
+      "...OffFFFFFFFFLLLLOOOO..",
+      "....OfffFFFFLLLLLO......",
+      "...OBBBBBBBBBBBBBO......",
+      "...ObBBBBBBBBBBbbO......",
+      "....OOOOOOOOOOOOO.......",
     },
     skins = {
       { name = "Prateria", pal = pal{ F = "e0702a", f = "a84a1a", L = "fff2e0", W = "ffffff", E = "111111",
@@ -130,22 +153,29 @@ Heroes.list = {
   {
     id = "coniglio", name = "Coniglio Ragnar", title = "Coniglio vichingo", price = 350, tail = "rabbit",
     head = {
-      "...OFO.OFO....",
-      "...OLO.OLO....",
-      "...OLO.OLO....",
-      "MO.OFO.OFO.OM.",
-      "MMOOMMMMMMOMM.",
-      ".OMMMMMMMMMMO.",
-      ".OmmmmmmmmmmO.",
-      ".OFFFFFFWWFFO.",
-      "OFFFFFFFWEFFFO",
-      "OFFFFFFFLLLNFO",
-      "OfFFFFFLLLLLO.",
-      ".OffFFFLLLLO..",
-      "..OOOOOOOOO...",
+      ".....OFFO....OFFO.......",
+      ".....OLLO....OLLO.......",
+      ".....OLLO....OLLO.......",
+      ".....OLLO....OLLO.......",
+      ".OO..OFFO....OFFO...OO..",
+      "OWWO.OFFO....OFFO..OWWO.",
+      "OWWWOOMMMMMMMMMMMOOWWWO.",
+      ".OWWMMMMMMMMMMMMMMMWWO..",
+      "..OMMMMsMMMMMMMMMMMMMO..",
+      ".OmmmmmmmmmmmmmmmmmmmmO.",
+      ".OFFFFFFFFFFFFFWWWFFFO..",
+      "OfFFFFFFFFFFFFWWWEEFFFO.",
+      "OfFFFFFFFFFFFFWWWEEFFFO.",
+      "OfFFFFFFFFFFFFFFFFFLLLO.",
+      "OfFFFFFFFFFFFFFFFFLLLNNO",
+      "OffFFFFFFFFFFFFFFLLLLLO.",
+      ".OffFFFFFFFFFFFFFLOWOLO.",
+      "..OfffFFFFFFFFFFFLLLLO..",
+      "...OOfffffffffffffOO....",
+      ".....OOOOOOOOOOOOOO.....",
     },
     skins = {
-      { name = "Fiordo", pal = pal{ F = "9a9aa6", f = "6a6a78", L = "f0d8d8", W = "ffffff", E = "111111",
+      { name = "Fiordo", pal = pal{ F = "b08462", f = "7a5638", L = "f2dcc8", W = "ffffff", E = "111111",
         N = "d86a80", M = "c8ccd4", m = "8a8e98", C = "7a5434", c = "4e3420" } },
       { name = "Neve", price = 150, pal = pal{ F = "f6f6fa", f = "c4c4d4", L = "ffd8e0", W = "ffffff", E = "c0202a",
         N = "e87a90", M = "f0c84a", m = "b08a20", C = "3a6aa8", c = "264a78" } },
@@ -156,19 +186,23 @@ Heroes.list = {
   {
     id = "procione", name = "Procione Lesto", title = "Procione ladro", price = 450, tail = "raccoon",
     head = {
-      ".OO.......OO..",
-      "OFfO.....OfFO.",
-      "OFFFOOOOOFFFO.",
-      "OFFFFFFFFFFFFO",
-      "OFFLLLFFFFLLFO",
-      "OBBBBBBBWWBBBO",
-      "OBBBBBBBWEBBBO",
-      "OFFFFFFFFFLLLO",
-      "OFFFFFFFLLLLNO",
-      "OfFFFFFLLLLLO.",
-      ".OfFFFFFLLLO..",
-      "..OOfffffOO...",
-      "....OOOOO.....",
+      "...OOO...........OOO....",
+      "..OfFfO.........OfFfO...",
+      "..OFLFOOOOOOOOOOOFLFO...",
+      "..OFFFFFHHHHFFFFFFFFO...",
+      ".OFFFFFFFFFFFFFFFFFFFO..",
+      ".OFFLLLFFFFFFFFFLLLFFO..",
+      "OfFFFFFFFFFFFFFFFFFFFFO.",
+      "OBBBBBBBBBBBBBWWWWBBBBO.",
+      "OBBBBBBBBBBBBWWWWEEBBBBO",
+      "OBBBBBBBBBBBBWWWWEEBBBO.",
+      "OfFFFFFFFFFFFFFFFFLLLLO.",
+      "OfFFFFFFFFFFFFFFFLLLLNNO",
+      "OffFFFFFFFFFFFFFLLLLLNNO",
+      ".OffFFFFFFFFFFFFLLOOLLO.",
+      ".OfffFFFFFFFFFFFLLLLLO..",
+      "..OOfffffffffffffffOO...",
+      "....OOOOOOOOOOOOOOO.....",
     },
     skins = {
       { name = "Bidone", pal = pal{ F = "8a8a94", f = "5c5c66", L = "e4e4ea", W = "ffffff", E = "111111",
@@ -203,156 +237,187 @@ function Heroes.get(id) return Heroes.by_id[id] or Heroes.list[1] end
 function Heroes.skin(h, i) return h.skins[i] or h.skins[1] end
 
 -- ---------------------------------------------------------------------------
--- Disegno. Posa ricavata dallo stato del giocatore (vero o finto, per i menu).
+-- Disegno. Tutto in "pixel d'arte" (mezzo pixel del mondo): il personaggio e' alto
+-- circa 24 pixel del mondo, un po' piu' della sua area di collisione (20).
 -- p: x, y, facing, vx, vy, grounded, id, action, sliding, wall
 -- team: colore del giocatore (sciarpa e cintura), flash: tutto bianco (colpito)
 
+local Art = require("src.art")
 local lg
+local S = 0.5
+local BOOT = { 0.16, 0.11, 0.09 }
 
-local function setc(c, a, k)
-  k = k or 1
-  lg.setColor(min(1, c[1] * k), min(1, c[2] * k), min(1, c[3] * k), a)
+local function shade(c, k) return { min(1, c[1] * k), min(1, c[2] * k), min(1, c[3] * k) } end
+
+-- colori ricavati: luce del pelo, ombra del vestito
+local function full_pal(P)
+  if P._full then return P._full end
+  local q = {}
+  for k, v in pairs(P) do q[k] = v end
+  q.H = q.H or shade(P.F, 1.25)
+  q.O = OUTLINE
+  q.k = q.k or { 0.06, 0.05, 0.08 }
+  q.y = q.y or { 0.95, 0.75, 0.2 }
+  q.s = q.s or { 0.95, 0.95, 1 }
+  P._full = q
+  return q
 end
 
+local WHITE = { 1, 1, 1 }
+local function white() return WHITE end
+
+-- code (unita' d'arte, rivolte a destra: la coda sta a sinistra)
 local function draw_tail(kind, P, a, t, speed)
-  local sway = sin(t * 4) * 1.5 + min(3, speed / 50)
+  local sway = sin(t * 4) * 3 + min(6, speed / 25)
   local rect = lg.rectangle
+  local function blob(x, y, r, c)
+    lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", x - r - 1, y - r - 1, 2 * r + 2, 2 * r + 2)
+    lg.setColor(c[1], c[2], c[3], a); rect("fill", x - r, y - r, 2 * r, 2 * r)
+  end
   if kind == "cat" then
-    for i = 0, 5 do
-      local tx, ty = -6 - i, -7 - i * 1.2 + sin(t * 4 + i * 0.6) * (i / 3)
-      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", tx - 1, ty - 1, 3, 3)
-    end
-    for i = 0, 5 do
-      local tx, ty = -6 - i, -7 - i * 1.2 + sin(t * 4 + i * 0.6) * (i / 3)
-      setc(i >= 4 and P.f or P.F, a); rect("fill", tx, ty, 1, 1)
-    end
-  elseif kind == "fox" or kind == "raccoon" then
     local pts = {}
-    for i = 0, 4 do pts[#pts + 1] = { -6 - i * 1.6, -7 + i * 0.6 - sway * i / 5 } end
+    for i = 0, 7 do pts[#pts + 1] = { -10 - i * 2, -14 - i * 2.4 + sin(t * 4 + i * 0.6) * (i / 2) } end
     for _, q in ipairs(pts) do
-      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", q[1] - 3, q[2] - 3, 6, 6)
+      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", q[1] - 2, q[2] - 2, 4, 4)
     end
     for i, q in ipairs(pts) do
+      local c = (i % 2 == 0) and P.f or P.F
+      lg.setColor(c[1], c[2], c[3], a); rect("fill", q[1] - 1, q[2] - 1, 2, 2)
+    end
+  elseif kind == "fox" or kind == "raccoon" then
+    local n = 6
+    local pts = {}
+    for i = 0, n - 1 do pts[#pts + 1] = { -10 - i * 3, -12 + i * 1.2 - sway * i / n } end
+    for i, q in ipairs(pts) do
+      local r = (i == 1 or i == n) and 3 or 4
+      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", q[1] - r - 1, q[2] - r - 1, 2 * r + 2, 2 * r + 2)
+    end
+    for i, q in ipairs(pts) do
+      local r = (i == 1 or i == n) and 3 or 4
       local c = P.F
-      if kind == "fox" and i == #pts then c = P.L end
+      if kind == "fox" and i >= n - 1 then c = P.L end
       if kind == "raccoon" and i % 2 == 0 then c = P.B or P.f end
-      setc(c, a); rect("fill", q[1] - 2, q[2] - 2, 4, 4)
+      lg.setColor(c[1], c[2], c[3], a); rect("fill", q[1] - r, q[2] - r, 2 * r, 2 * r)
+      lg.setColor(1, 1, 1, 0.15 * a); rect("fill", q[1] - r, q[2] - r, 2 * r, 1)
     end
   elseif kind == "rabbit" then
-    lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", -8, -9, 5, 5)
-    setc(P.L, a); rect("fill", -7, -8, 3, 3)
+    blob(-10, -15, 4, P.L)
   elseif kind == "bear" then
-    lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", -7, -9, 4, 4)
-    setc(P.f, a); rect("fill", -6, -8, 2, 2)
+    blob(-9, -16, 3, P.f)
   end
+end
+
+function Heroes.hand_color(hero, skin_i)
+  return Heroes.skin(Heroes.get(hero), skin_i).pal.F
 end
 
 function Heroes.draw(hero, skin_i, p, team, alpha, flash, time, ps)
   lg = love.graphics
   local h = Heroes.get(hero)
-  local skin = Heroes.skin(h, skin_i)
-  local P = skin.pal
-  if flash then
-    local W = { 1, 1, 1 }
-    P = setmetatable({}, { __index = function() return W end })
-  end
+  local P = full_pal(Heroes.skin(h, skin_i).pal)
+  local tint = flash and white or nil
+  local function C(c) return flash and WHITE or c end
   local x, y = floor(p.x), floor(p.y)
   local f = p.facing or 1
   if p.sliding and (p.wall or 0) ~= 0 then f = -p.wall end   -- sul muro guarda via dalla parete
   local a = alpha or 1
   local dash = p.action and p.action.type == "dash"
   local vx, vy = p.vx or 0, p.vy or 0
-  local bob, l1, l2, k1, k2 = 0, 0, 0, 0, 0
-  local hand = nil
+  local bob, l1, l2, k1, k2, arm = 0, 0, 0, 0, 0, 0
+  local hand_up = false
   if dash then
-    l1, l2, k1, k2 = -2, -4, 1, 2
+    l1, l2, k1, k2, arm = -4, -8, 2, 4, -4
   elseif p.sliding then
-    l1, l2, k1, k2 = -1, -3, 2, 0
-    hand = { -6, -14 }
+    l1, l2, k1, k2 = -2, -6, 4, 0
+    hand_up = true
   elseif not p.grounded then
-    if vy < -40 then l1, l2, k1, k2 = 1, -2, 2, 1 else l1, l2, k1, k2 = 2, -2, 0, 1 end
+    if vy < -40 then l1, l2, k1, k2, arm = 2, -4, 4, 2, -3 else l1, l2, k1, k2, arm = 4, -4, 0, 2, 2 end
   elseif abs(vx) > 20 then
     local ph = ((ps and ps.dist) or 0) / 6
-    l1 = floor(sin(ph) * 3 + 0.5); l2 = -l1
-    k1 = floor(max(0, cos(ph)) * 2 + 0.5); k2 = floor(max(0, -cos(ph)) * 2 + 0.5)
-    bob = (abs(sin(ph)) > 0.7) and -1 or 0
+    l1 = floor(sin(ph) * 6 + 0.5); l2 = -l1
+    k1 = floor(max(0, cos(ph)) * 4 + 0.5); k2 = floor(max(0, -cos(ph)) * 4 + 0.5)
+    bob = (abs(sin(ph)) > 0.7) and -2 or 0
+    arm = -l1
   else
     bob = (sin(time * 2.5 + (p.id or 0) * 1.7) > 0.4) and 1 or 0
   end
   local blink = ((time + (p.id or 0) * 0.7) % 3.3) < 0.12
-  local sw = 3 + min(6, floor(abs(vx) / 30))
-  local fl = floor(sin(time * 16 + (p.id or 0)) * (abs(vx) > 40 and 1 or 0.5) + 0.5)
-  local T = flash and { 1, 1, 1 } or team
+  local sw = 6 + min(12, floor(abs(vx) / 15))
+  local fl = floor(sin(time * 16 + (p.id or 0)) * (abs(vx) > 40 and 2 or 1) + 0.5)
+  local T = C(team)
+  local Td = C(shade(team, 0.65))
   local rect = lg.rectangle
 
   lg.push()
   lg.translate(x, y)
-  lg.scale(f, 1)
+  lg.scale(f * S, S)
   if dash then lg.shear(-0.25, 0) end
 
-  draw_tail(h.tail, P, a, time + (p.id or 0), abs(vx))
+  draw_tail(h.tail, flash and setmetatable({}, { __index = white }) or P, a, time + (p.id or 0), abs(vx))
 
-  -- corpo: gambe, busto, sciarpa (contorno prima, poi colore)
+  -- parti del corpo: { colore, x, y, w, h }, prima tutte col contorno, poi i colori
+  local Cc, cc = C(P.C), C(P.c)
   local parts = {
-    { P.c, -4 + l2, -5, 3, 5 - k2 },
-    { P.C, 1 + l1, -5, 3, 5 - k1 },
-    { P.C, -4, -13 + bob, 8, 8 },
-    { T, -4 - sw, -13 + bob + fl, sw + 2, 2 },
+    { cc, -6 + l2, -13, 5, 13 - k2 },                 -- gamba dietro
+    { C(BOOT), -7 + l2, -4 - k2, 7, 4 },              -- stivale dietro
+    { C(shade(P.C, 0.7)), -10 + arm, -25 + bob, 4, 9 }, -- braccio dietro
+    { C(P.F), -10 + arm, -17 + bob, 4, 3 },           -- mano dietro
+    { cc, 1 + l1, -13, 5, 13 - k1 },                  -- gamba davanti
+    { C(BOOT), 0 + l1, -4 - k1, 8, 4 },               -- stivale davanti
+    { Cc, -7, -28 + bob, 14, 16 },                    -- busto
+    { T, -8 - sw, -28 + bob + fl, sw + 2, 4 },        -- coda della sciarpa
+    { T, -8, -29 + bob, 16, 4 },                      -- sciarpa al collo
   }
-  if hand then parts[#parts + 1] = { P.F, hand[1], hand[2] + bob, 2, 2 } end
+  if hand_up then parts[#parts + 1] = { C(P.F), -12, -30 + bob, 4, 4 } end
   lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a)
   for _, q in ipairs(parts) do rect("fill", q[2] - 1, q[3] - 1, q[4] + 2, q[5] + 2) end
-  for _, q in ipairs(parts) do setc(q[1], a); rect("fill", q[2], q[3], q[4], q[5]) end
-  -- piedi, dettagli del vestito, cintura col colore del giocatore
-  setc(P.f, a); rect("fill", -4 + l2, -1 - k2, 3, 1); rect("fill", 1 + l1, -1 - k1, 4, 1)
-  setc(P.c, a); rect("fill", -1, -12 + bob, 1, 5)
-  setc(P.L, a); rect("fill", 0, -12 + bob, 3, 3)
-  setc(T, a); rect("fill", -4, -7 + bob, 8, 2)
-  setc(T, a, 1.3); rect("fill", 1, -7 + bob, 2, 2)
-
-  -- testa in pixel art (la riga piu' bassa poggia sul busto)
-  local hx, hy = -7, -24 + bob
-  for _, r in ipairs(h.runs) do
-    local ch = r[1]
-    local c
-    if ch == "O" then c = OUTLINE
-    elseif ch == "E" and blink then c = P.F
-    elseif ch == "W" and blink then c = P.f
-    else c = P[ch] or P.F end
-    setc(c, a)
-    rect("fill", hx + r[2], hy + r[3], r[4], 1)
+  for _, q in ipairs(parts) do
+    lg.setColor(q[1][1], q[1][2], q[1][3], a)
+    rect("fill", q[2], q[3], q[4], q[5])
   end
+  -- ombre e luci del busto, cintura, fibbia, pieghe della sciarpa
+  local dk = C(shade(P.C, 0.72))
+  lg.setColor(dk[1], dk[2], dk[3], a); rect("fill", -7, -28 + bob, 3, 16)
+  local lt = C(shade(P.C, 1.25))
+  lg.setColor(lt[1], lt[2], lt[3], a); rect("fill", -4, -25 + bob, 10, 1)
+  lg.setColor(T[1], T[2], T[3], a); rect("fill", -7, -16 + bob, 14, 3)
+  local gold = C({ 1, 0.85, 0.35 })
+  lg.setColor(gold[1], gold[2], gold[3], a); rect("fill", 2, -16 + bob, 3, 3)
+  lg.setColor(Td[1], Td[2], Td[3], a); rect("fill", -8, -26 + bob, 16, 1); rect("fill", -8 - sw, -26 + bob + fl, sw, 1)
+  local bh = C(shade(BOOT, 2))
+  lg.setColor(bh[1], bh[2], bh[3], a); rect("fill", 1 + l1, -4 - k1, 6, 1); rect("fill", -6 + l2, -4 - k2, 5, 1)
+
+  -- testa: la riga piu' bassa poggia sulla sciarpa
+  local gw, gh = Art.size(h.head)
+  local hx, hy = -12, -27 + bob - gh + 3
+  local hp = P
+  if blink and not flash then
+    hp = setmetatable({ E = P.F, W = P.f }, { __index = P })
+  end
+  Art.draw(h.head, hp, hx, hy, 1, a, tint)
   -- nodo della fascia del ninja che svolazza
   if h.knot then
-    local kc = P[h.knot]
+    local kc = C(P[h.knot])
     for i = 0, 2 do
-      local kx, ky = hx - 1 - i * 2, hy + 4 + i + floor(sin(time * 12 + i) * 0.8 + 0.5)
-      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", kx - 1, ky - 1, 4, 3)
-      setc(kc, a); rect("fill", kx, ky, 2, 1)
+      local kx, ky = hx - 2 - i * 4, hy + 6 + i * 2 + floor(sin(time * 12 + i) * 1.5 + 0.5)
+      lg.setColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], a); rect("fill", kx - 1, ky - 1, 6, 4)
+      lg.setColor(kc[1], kc[2], kc[3], a); rect("fill", kx, ky, 4, 2)
     end
   end
   lg.pop()
 end
 
--- solo la testa, come icona (HUD, podio). gray: versione spenta per chi e' eliminato
+-- solo la testa, come icona (HUD, podio). s: scala in pixel del mondo per pixel d'arte * 2
+-- gray: versione spenta per chi e' eliminato
 function Heroes.draw_head(hero, skin_i, x, y, s, alpha, gray)
   lg = love.graphics
   local h = Heroes.get(hero)
-  local P = Heroes.skin(h, skin_i).pal
-  lg.push()
-  lg.translate(x, y)
-  lg.scale(s or 1)
-  for _, r in ipairs(h.runs) do
-    local c = (r[1] == "O") and OUTLINE or (P[r[1]] or P.F)
-    if gray then
-      local v = (c[1] + c[2] + c[3]) / 3 * 0.6
-      lg.setColor(v, v, v, alpha or 1)
-    else
-      lg.setColor(c[1], c[2], c[3], alpha or 1)
-    end
-    lg.rectangle("fill", r[2], r[3], r[4], 1)
+  local P = full_pal(Heroes.skin(h, skin_i).pal)
+  local tint = nil
+  if gray then
+    tint = function(c) local v = (c[1] + c[2] + c[3]) / 3 * 0.6; return { v, v, v } end
   end
-  lg.pop()
+  Art.draw(h.head, P, x, y, (s or 1) * 0.6, alpha, tint)
 end
 
 return Heroes

@@ -44,9 +44,9 @@ local THEMES = {
   },
 }
 THEMES.Miniera = {
-  sky = { { 0.03, 0.02, 0.02 }, { 0.12, 0.07, 0.05 } },
-  far = "cave", farc = { 0.10, 0.06, 0.05 }, nearc = { 0.06, 0.035, 0.03 },
-  stone = { 0.42, 0.30, 0.22 }, top = { 0.50, 0.38, 0.26 }, pattern = "rock",
+  sky = { { 0.07, 0.05, 0.05 }, { 0.22, 0.14, 0.10 } },
+  far = "cave", farc = { 0.17, 0.11, 0.09 }, nearc = { 0.11, 0.07, 0.055 },
+  stone = { 0.52, 0.38, 0.27 }, top = { 0.62, 0.48, 0.32 }, pattern = "rock",
   plat = { 0.62, 0.42, 0.22 }, spike = { 0.55, 0.45, 0.38 }, deco = "mine", ambient = "dust",
 }
 
@@ -213,6 +213,37 @@ local function draw_belt_base(x, y)
   lg.setColor(0.15, 0.15, 0.18); lg.circle("fill", x + 4, y + 10, 2.5); lg.circle("fill", x + 12, y + 10, 2.5)
 end
 
+-- cose appese sotto le piattaforme: stendardi (arena), lampade (fabbrica, miniera), lucine (tetti)
+local function draw_hanging(w, th, c, r, x, y, anims)
+  if w:tile(c, r + 1) ~= "." or w:tile(c, r + 2) ~= "." then return end
+  local hv = hash(c * 17, r * 5)
+  local d = th.deco
+  if d == "arena" and hv < 0.12 and w:tile(c - 1, r) == "=" and w:tile(c + 1, r) == "=" then
+    lg.setColor(0.25, 0.2, 0.15); rect(x + 4, y + 5, 8, 1)
+    local cr = hash(c, r) > 0.5 and { 0.7, 0.18, 0.15 } or { 0.2, 0.3, 0.6 }
+    lg.setColor(0.08, 0.05, 0.05); rect(x + 4.5, y + 5.5, 7, 13); lg.polygon("fill", x + 4.5, y + 18.5, x + 11.5, y + 18.5, x + 8, y + 22)
+    col(cr); rect(x + 5, y + 6, 6, 12); lg.polygon("fill", x + 5, y + 18, x + 11, y + 18, x + 8, y + 21)
+    lg.setColor(0.95, 0.78, 0.3); rect(x + 7.5, y + 9, 1, 6); rect(x + 6, y + 11, 4, 1)
+    col(cr, 0.7); rect(x + 5, y + 6, 1.5, 12)
+  elseif (d == "factory" or d == "mine") and hv < 0.1 then
+    lg.setColor(0.2, 0.2, 0.22); rect(x + 7.5, y + 5, 1, 6)
+    if d == "mine" then
+      lg.setColor(0.08, 0.06, 0.05); rect(x + 5, y + 10, 6, 7)
+      lg.setColor(1, 0.8, 0.4); rect(x + 6, y + 11, 4, 5)
+      anims[#anims + 1] = { kind = "glow", x = x + 8, y = y + 13, color = { 1, 0.7, 0.3 }, seed = hv }
+    else
+      anims[#anims + 1] = { kind = "lamp", x = x + 8, y = y + 10, seed = hv }
+    end
+  elseif d == "roofs" and w:tile(c + 1, r) == "=" and hv < 0.5 then
+    -- filo di lucine colorate che pende tra le travi
+    lg.setColor(0.15, 0.15, 0.18)
+    rect(x, y + 6, T, 0.5)
+    local cols = { { 1, 0.4, 0.4 }, { 1, 0.85, 0.3 }, { 0.4, 0.8, 1 }, { 0.5, 1, 0.5 } }
+    local cc = cols[(c % 4) + 1]
+    anims[#anims + 1] = { kind = "bulb", x = x + 8, y = y + 7.5, color = cc, seed = hash(c, r) }
+  end
+end
+
 local function draw_platform(w, th, c, r, x, y)
   local P = th.plat
   col(P, 1); rect(x, y, T, 4)
@@ -338,6 +369,7 @@ local function far_layer(w, th, kind, color, near)
 end
 
 local cache = {}
+local last_r = nil
 
 local function prepare(w)
   local cv = cache[w]
@@ -360,13 +392,38 @@ local function prepare(w)
       if w.grid[r][c] ~= "#" then draw_shade(w, c, r, (c - 1) * T, (r - 1) * T) end
     end
   end
+  -- oggetti di scena: su pavimenti pieni, con due caselle libere sopra, lontani da molle e portali
+  local Props = require("src.props")
+  local set = Props.THEME[th.deco or ""]
+  if set then
+    local last = -100
+    for r = 3, w.rows_n - 1 do
+      for c = 2, w.cols - 1 do
+        local below = w.grid[r + 1] and w.grid[r + 1][c]
+        local solid_below = (below == "#" and not w.breakable[r + 1][c] and not w.belts[r + 1][c]) or below == "="
+        if solid_below and w.grid[r][c] == "." and w.grid[r - 1][c] == "." and w.grid[r - 2][c] == "."
+           and hash(c * 5, r * 3) < 0.2 and (c - last > 4 or r ~= last_r) then
+          local x, y = (c - 0.5) * T, r * T
+          local near = false
+          for _, g in ipairs(w.springs) do if abs(g.x - x) < 24 and abs(g.y - y) < 20 then near = true end end
+          for _, g in ipairs(w.portals) do if abs(g.x - x) < 24 and abs(g.y - y) < 40 then near = true end end
+          if not near then
+            local pick = set[floor(hash(c, r * 11) * #set) + 1]
+            Props.draw(pick[1], x, y)
+            if pick.glow then cv.anims[#cv.anims + 1] = { kind = "glow", x = x, y = y - 10, color = pick.glow, seed = hash(c, r) } end
+            last, last_r = c, r
+          end
+        end
+      end
+    end
+  end
   for r = 1, w.rows_n do
     for c = 1, w.cols do
       local t, x, y = w.grid[r][c], (c - 1) * T, (r - 1) * T
       if t == "#" and w.breakable[r] and w.breakable[r][c] then draw_breakable(w, th, c, r, x, y)
       elseif t == "#" and w.belts[r] and w.belts[r][c] then draw_belt_base(x, y)
       elseif t == "#" then draw_solid(w, th, c, r, x, y, cv.anims)
-      elseif t == "=" then draw_platform(w, th, c, r, x, y)
+      elseif t == "=" then draw_platform(w, th, c, r, x, y); draw_hanging(w, th, c, r, x, y, cv.anims)
       elseif t == "^" then draw_spikes(th, x, y) end
     end
   end
@@ -422,13 +479,38 @@ function Look.map(w, time)
   for _, a in ipairs(cv.anims) do
     local s = a.seed * 10
     if a.kind == "torch" then
-      lg.setColor(0.25, 0.18, 0.12); rect(a.x - 1, a.y, 3, 6)
       local f = sin(time * 13 + s) * 0.5 + sin(time * 7.3 + s * 2) * 0.5
+      -- alone morbido: tanti cerchi additivi sempre piu' larghi e deboli
       lg.setBlendMode("add")
-      lg.setColor(1, 0.55, 0.2, 0.10 + 0.03 * f); lg.circle("fill", a.x, a.y - 3, 22 + 2 * f)
+      for k = 1, 6 do
+        lg.setColor(1, 0.5, 0.18, 0.022 + 0.004 * f)
+        lg.circle("fill", a.x, a.y - 3, 4 + k * 4 + f)
+      end
       lg.setBlendMode("alpha")
-      lg.setColor(1, 0.45, 0.1); rect(a.x - 2, a.y - 5 - f, 5, 5 + f)
-      lg.setColor(1, 0.9, 0.4); rect(a.x - 1, a.y - 3, 3, 3)
+      -- supporto e fiamma a tre strati
+      lg.setColor(0.08, 0.06, 0.05); rect(a.x - 2, a.y - 1, 5, 3); rect(a.x - 1, a.y + 2, 3, 5)
+      lg.setColor(0.45, 0.32, 0.2); rect(a.x - 1.5, a.y - 0.5, 4, 1.5)
+      lg.setColor(0.9, 0.25, 0.08); rect(a.x - 2, a.y - 6 - f, 5, 6 + f)
+      lg.setColor(1, 0.6, 0.15); rect(a.x - 1.5, a.y - 5 - f * 0.7, 4, 5)
+      lg.setColor(1, 0.95, 0.6); rect(a.x - 0.5, a.y - 3, 2, 2.5)
+    elseif a.kind == "bulb" then
+      local on = sin(time * 2 + a.seed * 20) > -0.3
+      lg.setColor(a.color[1], a.color[2], a.color[3], on and 1 or 0.35)
+      rect(a.x - 1, a.y, 2, 2)
+      if on then
+        lg.setBlendMode("add")
+        lg.setColor(a.color[1], a.color[2], a.color[3], 0.12)
+        lg.circle("fill", a.x, a.y + 1, 5)
+        lg.setBlendMode("alpha")
+      end
+    elseif a.kind == "glow" then
+      local f = sin(time * 3 + s) * 0.5 + 0.5
+      lg.setBlendMode("add")
+      for k = 1, 5 do
+        lg.setColor(a.color[1], a.color[2], a.color[3], 0.02 + 0.008 * f)
+        lg.circle("fill", a.x, a.y, 3 + k * 4)
+      end
+      lg.setBlendMode("alpha")
     elseif a.kind == "lamp" then
       local on = not (sin(time * 2 + s) > 0.97 and sin(time * 31) > 0)
       lg.setColor(0.2, 0.22, 0.22); rect(a.x - 4, a.y, 8, 3)

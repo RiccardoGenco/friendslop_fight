@@ -490,7 +490,7 @@ local function draw_main(time, W, H)
   end
   local it = ITEMS[Menu.sel]
   Render.text(it.sub, W / 2, 252, UI.dim, "small", "center", W)
-  Render.text("v0.9", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text("v0.10", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 

@@ -149,8 +149,10 @@ function Debug.draw(game, fps)
   if Debug.paused then flags[#flags + 1] = "PAUSA" end
   if Debug.slowmo then flags[#flags + 1] = "SLOW" end
   if Debug.hitboxes then flags[#flags + 1] = "HITBOX" end
-  Render.text(string.format("%d fps  frame %d  %s", fps, game.frame, table.concat(flags, " ")),
-    Render.W - 6, Render.H - 12, { 0.7, 0.9, 0.7 }, "small", "right", 400)
+  if #flags > 0 or Debug.panel then
+    Render.text(string.format("%d fps  frame %d  %s", fps, game.frame, table.concat(flags, " ")),
+      Render.W - 6, Render.H - 12, { 0.7, 0.9, 0.7 }, "small", "right", 400)
+  end
 
   if Debug.panel then
     lg.setColor(0, 0, 0, 0.78)

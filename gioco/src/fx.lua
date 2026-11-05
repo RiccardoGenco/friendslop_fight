@@ -6,14 +6,14 @@ local Audio = require("src.audio")
 
 local Fx = { particles = {}, ghosts = {}, rings = {}, shake = 0,
              freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {}, bolts = {}, banner = nil,
-             columns = {} }
+             columns = {}, decals = {}, muzzles = {} }
 
 local function rnd(a, b) return a + love.math.random() * (b - a) end
 
 function Fx.reset()
   Fx.particles, Fx.ghosts, Fx.rings, Fx.shake = {}, {}, {}, 0
   Fx.freeze, Fx.kx, Fx.ky, Fx.flash, Fx.flashes, Fx.pl = 0, 0, 0, 0, {}, {}
-  Fx.bolts, Fx.banner, Fx.columns = {}, nil, {}
+  Fx.bolts, Fx.banner, Fx.columns, Fx.decals, Fx.muzzles = {}, nil, {}, {}, {}
 end
 
 function Fx.add_shake(v)
@@ -29,6 +29,68 @@ function Fx.burst(x, y, color, n, speed, life, grav, size)
       life = rnd(life * 0.6, life), max = life, color = color, grav = grav or 0, size = size or 2,
     }
   end
+end
+
+-- nuvolette rotonde che crescono e sfumano (polvere, fumo)
+function Fx.puffs(x, y, color, n, speed, life, grav, size, grow)
+  for _ = 1, n do
+    local ang = rnd(0, math.pi * 2)
+    local sp = rnd(speed * 0.2, speed)
+    Fx.particles[#Fx.particles + 1] = {
+      kind = "puff", x = x + rnd(-2, 2), y = y + rnd(-2, 2), vx = math.cos(ang) * sp, vy = math.sin(ang) * sp,
+      life = rnd(life * 0.6, life), max = life, color = color, grav = grav or 0, size = rnd(size * 0.6, size),
+      grow = grow or 1, drag = 3,
+    }
+  end
+end
+
+-- palle di fuoco: colore dal bianco al giallo, arancio, rosso e infine fumo
+function Fx.fire(x, y, n, speed, life, size)
+  for _ = 1, n do
+    local ang = rnd(0, math.pi * 2)
+    local sp = rnd(speed * 0.1, speed)
+    Fx.particles[#Fx.particles + 1] = {
+      kind = "fire", x = x, y = y, vx = math.cos(ang) * sp, vy = math.sin(ang) * sp - 20,
+      life = rnd(life * 0.7, life), max = life, grav = -60, size = rnd(size * 0.6, size), grow = 0.6, drag = 4,
+    }
+  end
+end
+
+-- scintille: trattini che seguono la loro velocita'
+function Fx.sparks(x, y, color, n, speed, life, grav, dir)
+  for _ = 1, n do
+    local ang = dir and (dir + rnd(-0.6, 0.6)) or rnd(0, math.pi * 2)
+    local sp = rnd(speed * 0.4, speed)
+    Fx.particles[#Fx.particles + 1] = {
+      kind = "spark", x = x, y = y, vx = math.cos(ang) * sp, vy = math.sin(ang) * sp,
+      life = rnd(life * 0.5, life), max = life, color = color, grav = grav or 300, size = 1, drag = 1.5,
+    }
+  end
+end
+
+-- detriti che ruotano e cadono
+function Fx.chunks(x, y, color, n, speed, life, size)
+  for _ = 1, n do
+    local ang = rnd(-math.pi * 0.95, -math.pi * 0.05)
+    local sp = rnd(speed * 0.4, speed)
+    Fx.particles[#Fx.particles + 1] = {
+      kind = "chunk", x = x + rnd(-4, 4), y = y + rnd(-4, 4), vx = math.cos(ang) * sp, vy = math.sin(ang) * sp,
+      life = rnd(life * 0.7, life), max = life, color = color, grav = 700, size = rnd((size or 3) * 0.6, size or 3),
+      rot = rnd(0, 6), spin = rnd(-12, 12),
+    }
+  end
+end
+
+-- esplosione completa: lampo, onda d'urto, palla di fuoco, fumo, scintille, detriti, bruciatura a terra
+function Fx.explosion(x, y, r)
+  r = r or 40
+  Fx.rings[#Fx.rings + 1] = { x = x, y = y, r = r * 1.3, life = 0.22, max = 0.22, thin = true }
+  Fx.flashes[#Fx.flashes + 1] = { x = x, y = y, r = r * 0.7, color = { 1, 1, 0.9 }, life = 0.08, max = 0.08 }
+  Fx.fire(x, y, 10 + math.floor(r / 5), r * 2.2, 0.55, r * 0.32)
+  Fx.puffs(x, y - 4, { 0.22, 0.2, 0.22 }, 8 + math.floor(r / 8), r * 1.2, 1.3, -50, r * 0.22, 1.6)
+  Fx.sparks(x, y, { 1, 0.85, 0.4 }, 14, r * 7, 0.45, 500)
+  Fx.chunks(x, y, { 0.18, 0.15, 0.14 }, 6, r * 6, 0.9, 3)
+  Fx.decals[#Fx.decals + 1] = { x = x, y = y, r = r * 0.6, life = 5, max = 5 }
 end
 
 function Fx.spray(x, y, dir, color, n, speed, life)
@@ -112,7 +174,10 @@ function Fx.juice(e, game)
     Fx.hitstop(3)
     if (e.radius or 40) >= 40 then Fx.flash = math.max(Fx.flash, 0.18) end
   elseif t == "shoot" then
-    flash_at(e.x, e.y, MUZZLE[e.weapon] or 4, { 1, 0.95, 0.6 }, 0.06, false)
+    local p = e.id and game.players[e.id]
+    local ang = p and math.atan2(p.aimy or 0, p.aimx or 1) or 0
+    Fx.muzzles[#Fx.muzzles + 1] = { x = e.x, y = e.y, ang = ang, len = (MUZZLE[e.weapon] or 4) * 1.6, life = 0.07, max = 0.07 }
+    Fx.puffs(e.x, e.y, { 0.75, 0.75, 0.75 }, 2, 30, 0.4, -30, 2, 1.5)
     if e.id then Fx.pstate(e.id).recoil = RECOIL[e.weapon] or 3 end
   elseif t == "jump" or t == "doublejump" or t == "walljump" then
     local p = nearest(game, e.x, e.y)
@@ -136,7 +201,8 @@ function Fx.track(game)
     if p.alive then
       if p.grounded and not s.gy and s.vy > 200 then
         s.sq = math.min(0.4, s.vy / 1000)
-        Fx.burst(p.x, p.y, { 0.75, 0.75, 0.8 }, 3 + math.floor(s.vy / 140), 70, 0.25, 40, 1)
+        Fx.puffs(p.x - 4, p.y - 1, { 0.8, 0.78, 0.76 }, 2 + math.floor(s.vy / 200), 50, 0.35, -10, 2.5, 1)
+        Fx.puffs(p.x + 4, p.y - 1, { 0.8, 0.78, 0.76 }, 2 + math.floor(s.vy / 200), 50, 0.35, -10, 2.5, 1)
       end
       s.gy, s.vy = p.grounded, p.vy
       if p.grounded then
@@ -144,7 +210,7 @@ function Fx.track(game)
         s.dist = before + math.abs(p.vx) / 60
         -- un passo ogni ~19 px percorsi (stesso ritmo delle gambe)
         if math.abs(p.vx) > 50 and math.floor(s.dist / 18.85) ~= math.floor(before / 18.85) then
-          Fx.burst(p.x - p.vx * 0.02, p.y - 1, { 0.75, 0.72, 0.7 }, 2, 25, 0.25, -30, 1)
+          Fx.puffs(p.x - p.vx * 0.03, p.y - 1, { 0.78, 0.75, 0.72 }, 1, 20, 0.3, -20, 2, 0.8)
         end
         -- sgommata: si corre in un verso guardando nell'altro (inversione di marcia)
         if math.abs(p.vx) > 70 and p.facing * p.vx < 0 and game.frame % 3 == 0 then
@@ -166,6 +232,13 @@ function Fx.track(game)
 end
 
 function Fx.draw_under()
+  for _, d in ipairs(Fx.decals) do
+    local a = math.min(1, d.life / 1.5) * 0.45
+    love.graphics.setColor(0.05, 0.03, 0.03, a)
+    love.graphics.ellipse("fill", d.x, d.y, d.r, d.r * 0.55)
+    love.graphics.setColor(0.05, 0.03, 0.03, a * 0.6)
+    love.graphics.ellipse("fill", d.x, d.y, d.r * 1.4, d.r * 0.8)
+  end
   for _, g in ipairs(Fx.ghosts) do
     love.graphics.setColor(g.color[1], g.color[2], g.color[3], 0.4 * g.life / g.max)
     love.graphics.rectangle("fill", math.floor(g.x) - 5, math.floor(g.y) - 20, 10, 20)
@@ -188,8 +261,9 @@ function Fx.handle(e, game)
     -- colpi leggeri (fiamme, fuoco, nucleo del buco nero): effetto piccolo, niente scossa
     Fx.burst(e.x, e.y, color, 2, 60, 0.25, 100)
   elseif t == "hit" then
-    Fx.burst(e.x, e.y, color, 8 + math.floor(e.dmg / 4), 140 + e.dmg * 2, 0.4, 300)
-    Fx.burst(e.x, e.y, WHITE, 4, 120, 0.2, 0)
+    local dir = (e.dir and e.dir ~= 0) and (e.dir > 0 and 0 or math.pi) or nil
+    Fx.sparks(e.x, e.y, { 1, 0.95, 0.7 }, 6 + math.floor(e.dmg / 5), 180 + e.dmg * 3, 0.25, 200, dir)
+    Fx.puffs(e.x, e.y, color, 4 + math.floor(e.dmg / 8), 90, 0.35, 150, 3, 0.5)
     Fx.add_shake(math.min(5, 1 + e.dmg / 12))
     Audio.play("hit", 1.3 - math.min(0.6, e.dmg / 80))
   elseif t == "parry" then
@@ -210,8 +284,9 @@ function Fx.handle(e, game)
   elseif t == "counter" then
     Fx.burst(e.x, e.y, { 1, 0.9, 0.4 }, 8, 160, 0.25, 0)
   elseif t == "death" then
-    Fx.burst(e.x, e.y, color, 32, 230, 0.8, 350, 3)
-    Fx.burst(e.x, e.y, WHITE, 10, 160, 0.4, 0)
+    Fx.puffs(e.x, e.y, color, 18, 200, 0.8, 250, 5, 0.4)
+    Fx.puffs(e.x, e.y, { 0.9, 0.9, 0.95 }, 8, 70, 0.9, -40, 6, 1.4)
+    Fx.sparks(e.x, e.y, WHITE, 16, 320, 0.45, 300)
     Fx.add_shake(7)
     Audio.play("death")
   elseif t == "shoot" then
@@ -262,10 +337,7 @@ function Fx.handle(e, game)
     Audio.play("ricochet", 0.9 + love.math.random() * 0.3, 0.5)
   elseif t == "explosion" then
     local r = e.radius or 40
-    Fx.burst(e.x, e.y, { 1, 0.55, 0.15 }, 30, r * 5, 0.5, 120, 3)
-    Fx.burst(e.x, e.y, { 1, 0.9, 0.4 }, 16, r * 3, 0.3, 0, 2)
-    Fx.burst(e.x, e.y, { 0.35, 0.33, 0.33 }, 14, r * 2, 0.9, -40, 3)
-    Fx.rings[#Fx.rings + 1] = { x = e.x, y = e.y, r = r, life = 0.25, max = 0.25 }
+    Fx.explosion(e.x, e.y, r)
     Fx.add_shake(8)
     Audio.play("explosion")
   elseif t == "impact" then
@@ -273,15 +345,16 @@ function Fx.handle(e, game)
   elseif t == "pickup" then
     Audio.play("pickup")
   elseif t == "jump" then
-    Fx.burst(e.x, e.y, { 0.8, 0.8, 0.9 }, 3, 40, 0.2, 60, 1)
+    Fx.puffs(e.x, e.y - 1, { 0.8, 0.78, 0.76 }, 4, 50, 0.3, -20, 2.5, 1)
     Audio.play("jump")
   elseif t == "slide" then
     Fx.burst(e.x, e.y, { 0.7, 0.7, 0.75 }, 1, 25, 0.25, -20, 1)
   elseif t == "doublejump" then
-    Fx.burst(e.x, e.y, { 0.9, 0.95, 1 }, 6, 70, 0.25, 0, 1)
+    Fx.rings[#Fx.rings + 1] = { x = e.x, y = e.y - 2, r = 10, life = 0.18, max = 0.18, thin = true, color = { 0.9, 0.95, 1 } }
+    Fx.puffs(e.x, e.y, { 0.9, 0.95, 1 }, 5, 60, 0.3, 0, 2.5, 1)
     Audio.play("jump")
   elseif t == "walljump" then
-    Fx.burst(e.x, e.y, { 0.8, 0.8, 0.9 }, 5, 60, 0.25, 60, 1)
+    Fx.puffs(e.x, e.y, { 0.8, 0.78, 0.76 }, 5, 60, 0.3, 0, 2.5, 1)
     Audio.play("jump")
   elseif t == "dash" then
     local p = game.players[1]
@@ -335,12 +408,13 @@ function Fx.handle(e, game)
     if not e.small then Audio.play("pickup", 0.6, 0.6); Audio.play("telegraph", 1.8, 0.4) end
   elseif t == "blocks_broken" then
     for _, b in ipairs(e.list or {}) do
-      Fx.burst(b.x, b.y, { 0.55, 0.42, 0.3 }, 6, 150, 0.6, 500, 2)
+      Fx.chunks(b.x, b.y, { 0.55, 0.42, 0.3 }, 4, 180, 0.9, 3)
+      Fx.puffs(b.x, b.y, { 0.5, 0.45, 0.4 }, 2, 40, 0.6, -10, 5, 1)
     end
     Audio.play("break_", 0.8)
   elseif t == "rock" then
-    Fx.burst(e.x, e.y, { 0.55, 0.5, 0.45 }, 14, 150, 0.5, 400, 2)
-    Fx.burst(e.x, e.y, { 0.7, 0.68, 0.65 }, 8, 60, 0.7, -30, 3)
+    Fx.chunks(e.x, e.y, { 0.52, 0.47, 0.41 }, 8, 200, 0.8, 3)
+    Fx.puffs(e.x, e.y + 4, { 0.62, 0.56, 0.5 }, 10, 90, 0.8, -20, 5, 1.2)
     Fx.add_shake(4)
     Audio.play("break_", 0.6)
   elseif t == "round_start" then
@@ -358,6 +432,11 @@ function Fx.update(dt)
       table.remove(Fx.particles, i)
     else
       p.vy = p.vy + p.grav * dt
+      if p.drag then
+        local k = math.exp(-p.drag * dt)
+        p.vx, p.vy = p.vx * k, p.vy * k
+      end
+      if p.spin then p.rot = p.rot + p.spin * dt end
       p.x = p.x + p.vx * dt
       p.y = p.y + p.vy * dt
     end
@@ -371,7 +450,7 @@ function Fx.update(dt)
     Fx.banner.t = Fx.banner.t - dt
     if Fx.banner.t <= 0 then Fx.banner = nil end
   end
-  for _, list in ipairs({ Fx.flashes, Fx.ghosts, Fx.bolts, Fx.columns }) do
+  for _, list in ipairs({ Fx.flashes, Fx.ghosts, Fx.bolts, Fx.columns, Fx.decals, Fx.muzzles }) do
     for i = #list, 1, -1 do
       local f = list[i]
       f.life = f.life - dt
@@ -403,16 +482,76 @@ function Fx.draw()
   for _, r in ipairs(Fx.rings) do
     local k = 1 - r.life / r.max
     local c = r.color or { 1, 0.8, 0.4 }
+    if r.thin then
+      love.graphics.setLineWidth(2 * (1 - k) + 0.5)
+      love.graphics.setColor(c[1], c[2], c[3], 0.8 * (1 - k))
+      love.graphics.circle("line", r.x, r.y, r.r * (0.3 + 0.7 * k))
+      love.graphics.setLineWidth(1)
+      goto continue
+    end
     love.graphics.setColor(c[1], c[2], c[3], 0.6 * (1 - k))
     love.graphics.circle("fill", r.x, r.y, r.r * (0.4 + 0.6 * k))
     love.graphics.setColor(1, 1, 0.8, 0.9 * (1 - k))
     love.graphics.circle("line", r.x, r.y, r.r * (0.5 + 0.5 * k))
+    ::continue::
   end
+  local lg = love.graphics
+  -- fumo e polvere sotto, fuoco e scintille sopra (additivi)
   for _, p in ipairs(Fx.particles) do
+    local k = 1 - p.life / p.max
     local a = math.min(1, p.life / (p.max * 0.5))
-    love.graphics.setColor(p.color[1], p.color[2], p.color[3], a)
-    love.graphics.rectangle("fill", math.floor(p.x), math.floor(p.y), p.size, p.size)
+    if p.kind == "puff" then
+      local r = p.size * (1 + p.grow * k)
+      lg.setColor(p.color[1], p.color[2], p.color[3], a * 0.8)
+      lg.circle("fill", p.x, p.y, r)
+      lg.setColor(math.min(1, p.color[1] + 0.15), math.min(1, p.color[2] + 0.15), math.min(1, p.color[3] + 0.15), a * 0.5)
+      lg.circle("fill", p.x - r * 0.25, p.y - r * 0.3, r * 0.55)
+    elseif p.kind == "chunk" then
+      lg.push(); lg.translate(p.x, p.y); lg.rotate(p.rot)
+      lg.setColor(p.color[1], p.color[2], p.color[3], a)
+      lg.rectangle("fill", -p.size / 2, -p.size / 2, p.size, p.size * 0.7)
+      lg.setColor(p.color[1] * 1.5, p.color[2] * 1.5, p.color[3] * 1.5, a)
+      lg.rectangle("fill", -p.size / 2, -p.size / 2, p.size, 0.6)
+      lg.pop()
+    elseif p.kind == nil then
+      lg.setColor(p.color[1], p.color[2], p.color[3], a)
+      lg.rectangle("fill", math.floor(p.x), math.floor(p.y), p.size, p.size)
+    end
   end
+  lg.setBlendMode("add")
+  for _, p in ipairs(Fx.particles) do
+    local k = 1 - p.life / p.max
+    local a = math.min(1, p.life / (p.max * 0.5))
+    if p.kind == "fire" then
+      local r = p.size * (1 + p.grow * k)
+      local cr, cg, cb
+      if k < 0.15 then cr, cg, cb = 1, 1, 0.85
+      elseif k < 0.4 then cr, cg, cb = 1, 0.8, 0.3
+      elseif k < 0.7 then cr, cg, cb = 1, 0.45, 0.12
+      else cr, cg, cb = 0.6, 0.15, 0.05 end
+      lg.setColor(cr, cg, cb, 0.55 * a)
+      lg.circle("fill", p.x, p.y, r)
+      lg.setColor(cr, cg, cb, 0.5 * a)
+      lg.circle("fill", p.x, p.y, r * 0.55)
+    elseif p.kind == "spark" then
+      lg.setColor(p.color[1], p.color[2], p.color[3], a)
+      lg.setLineWidth(1)
+      lg.line(p.x - p.vx * 0.025, p.y - p.vy * 0.025, p.x, p.y)
+    end
+  end
+  -- fiammate degli spari
+  for _, m in ipairs(Fx.muzzles) do
+    local k = m.life / m.max
+    local ca, sa = math.cos(m.ang), math.sin(m.ang)
+    local function pt(f, side) return m.x + ca * f - sa * side, m.y + sa * f + ca * side end
+    local L = m.len * (1.2 - 0.4 * k)
+    local ax, ay = pt(0, -2.5); local bx, by = pt(L, 0); local cx, cy = pt(0, 2.5)
+    lg.setColor(1, 0.75, 0.3, 0.8 * k); lg.polygon("fill", ax, ay, bx, by, cx, cy)
+    local dx, dy = pt(L * 0.55, 0)
+    lg.setColor(1, 1, 0.85, k); lg.polygon("fill", ax, ay, dx, dy, cx, cy)
+    lg.circle("fill", m.x, m.y, 2.5 * k)
+  end
+  lg.setBlendMode("alpha")
   -- presse e geyser
   for _, c in ipairs(Fx.columns) do
     local k = 1 - c.life / c.max

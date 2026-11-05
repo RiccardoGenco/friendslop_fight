@@ -24,7 +24,7 @@ local Cam = { x = 320, y = 180, z = 1, world = nil }
 Render.cam = Cam
 
 local CAM = {
-  zoom_max = 1.0,        -- zoom massimo (1 = scala del vecchio prototipo)
+  zoom_max = 1.5,        -- zoom massimo: con i giocatori vicini la telecamera si avvicina
   margin_x = 120, margin_top = 90, margin_bottom = 50,
   follow = 5.0,          -- velocita' di inseguimento della posizione
   zoom_speed = 2.5,      -- velocita' del cambio di zoom
@@ -173,121 +173,67 @@ end
 -- ---------------------------------------------------------------------------
 -- Armi
 
-local function draw_weapon_shape(id, color)
-  lg.setColor(color[1], color[2], color[3])
-  if id == "sword" then
-    lg.rectangle("fill", 2, -1, 16, 2)
-    lg.setColor(0.55, 0.4, 0.2)
-    lg.rectangle("fill", 2, -3, 2, 6)
-  elseif id == "hammer" then
-    lg.setColor(0.55, 0.4, 0.2)
-    lg.rectangle("fill", 2, -1, 14, 2)
-    lg.setColor(color[1], color[2], color[3])
-    lg.rectangle("fill", 13, -6, 8, 12)
-    lg.setColor(1, 1, 1, 0.3)
-    lg.rectangle("fill", 13, -6, 8, 2)
-  elseif id == "pistol" then
-    lg.rectangle("fill", 2, -2, 9, 3)
-    lg.rectangle("fill", 3, 1, 3, 4)
-  elseif id == "shotgun" then
-    lg.rectangle("fill", 2, -2, 16, 3)
-    lg.setColor(0.55, 0.4, 0.2)
-    lg.rectangle("fill", 0, -1, 5, 4)
-  elseif id == "spear" then
-    lg.setColor(0.55, 0.4, 0.2)
-    lg.rectangle("fill", 0, -1, 26, 2)
-    lg.setColor(color[1], color[2], color[3])
-    lg.polygon("fill", 26, -3, 33, 0, 26, 3)
-  elseif id == "smg" then
-    lg.rectangle("fill", 2, -2, 11, 4)
-    lg.rectangle("fill", 6, 2, 3, 5)
-    lg.setColor(0.25, 0.3, 0.28)
-    lg.rectangle("fill", 13, -1, 3, 2)
-  elseif id == "sniper" then
-    lg.rectangle("fill", 0, -1, 24, 2)
-    lg.rectangle("fill", 0, -1, 7, 4)
-    lg.setColor(0.2, 0.25, 0.35)
-    lg.rectangle("fill", 7, -4, 7, 2)
-  elseif id == "grenade" then
-    lg.rectangle("fill", 2, -3, 13, 6)
-    lg.setColor(0.25, 0.3, 0.2)
-    lg.rectangle("fill", 13, -3, 3, 6)
-    lg.rectangle("fill", 5, 3, 3, 3)
-  elseif id == "whip" then
-    lg.rectangle("fill", 0, -1, 6, 3)
-    lg.setColor(0.45, 0.3, 0.18)
-    for i = 0, 7 do lg.rectangle("fill", 6 + i * 2, -1 + ((i % 2 == 0) and 0 or 1), 2, 1) end
-  elseif id == "katana" then
-    lg.rectangle("fill", 4, -1, 20, 1.5)
-    lg.setColor(0.2, 0.2, 0.25)
-    lg.rectangle("fill", 0, -1, 4, 2)
-    lg.setColor(0.8, 0.65, 0.2)
-    lg.rectangle("fill", 4, -2.5, 1, 5)
-  elseif id == "shield" then
-    lg.rectangle("fill", 3, -9, 4, 18)
-    lg.setColor(0.85, 0.85, 0.9)
-    lg.rectangle("fill", 5, -2, 2, 4)
-  elseif id == "boomerang" then
-    lg.polygon("fill", 2, -6, 10, 0, 2, 6, 5, 0)
-  elseif id == "flamer" then
-    lg.rectangle("fill", 2, -2, 13, 4)
-    lg.setColor(0.7, 0.2, 0.1)
-    lg.circle("fill", 4, 3, 3)
-    lg.setColor(0.3, 0.3, 0.3)
-    lg.rectangle("fill", 15, -1.5, 3, 3)
-  elseif id == "mines" then
-    lg.rectangle("fill", 2, -3, 9, 6)
-    lg.setColor(1, 0.3, 0.2)
-    lg.rectangle("fill", 5, -1, 2, 2)
-  elseif id == "hook" then
-    lg.rectangle("fill", 2, -1.5, 12, 3)
-    lg.setColor(0.85, 0.85, 0.9)
-    lg.rectangle("fill", 14, -4, 2, 8)
-    lg.rectangle("fill", 16, -4, 2, 2)
-    lg.rectangle("fill", 16, 2, 2, 2)
-  elseif id == "bazooka" then
-    lg.rectangle("fill", -2, -3, 22, 6)
-    lg.setColor(0.25, 0.28, 0.2)
-    lg.rectangle("fill", 18, -4, 3, 8)
-    lg.rectangle("fill", 6, 3, 3, 4)
-  elseif id == "gust" then
-    lg.rectangle("fill", 2, -2, 8, 4)
-    lg.polygon("fill", 10, -2, 18, -6, 18, 6, 10, 2)
-  elseif id == "bubble" then
-    lg.rectangle("fill", 2, -2, 9, 4)
-    lg.rectangle("fill", 3, 2, 3, 3)
-    lg.setColor(0.8, 0.95, 1, 0.8)
-    lg.circle("line", 14, 0, 3)
-  elseif id == "autoshotgun" then
-    lg.rectangle("fill", 2, -2, 16, 3)
-    lg.setColor(0.35, 0.25, 0.2)
-    lg.circle("fill", 8, 3, 3)
-    lg.rectangle("fill", 0, -1, 4, 4)
-  elseif id == "assault" then
-    lg.rectangle("fill", 0, -2, 20, 3)
-    lg.rectangle("fill", 8, 1, 3, 5)
-    lg.setColor(0.25, 0.3, 0.22)
-    lg.rectangle("fill", 0, -1, 4, 4)
-    lg.rectangle("fill", 20, -1, 3, 1)
-  elseif id == "blackhole" then
-    lg.rectangle("fill", 2, -3, 12, 6)
-    lg.setColor(0.08, 0.02, 0.15)
-    lg.circle("fill", 17, 0, 4)
-    lg.setColor(0.7, 0.4, 1, 0.9)
-    lg.circle("line", 17, 0, 4)
-  elseif id == "ghost" then
-    lg.setColor(color[1], color[2], color[3], 0.75)
-    lg.rectangle("fill", 0, -1.5, 22, 3)
-    lg.rectangle("fill", 0, -1, 6, 4)
-    lg.setColor(1, 1, 1, 0.5)
-    lg.rectangle("fill", 8, -3, 5, 1)
-  elseif id == "swarm" then
-    lg.rectangle("fill", 2, -4, 13, 8)
-    lg.setColor(0.3, 0.1, 0.15)
-    for k = -1, 1 do lg.circle("fill", 15, k * 2.5, 1.2) end
-  else
-    lg.rectangle("fill", 2, -1, 8, 2)
+local Art = require("src.art")
+local WeaponArt = require("src.weapon_art")
+local wpal_cache = {}
+local WBASE = Art.pal({ o = "140f14", m = "a4aab4", M = "5c626c", s = "eef2f8", w = "a0703a", W = "6e4824",
+                        g = "2a2630", k = "141418", y = "e8b830", r = "c83a3a", R = "7a2020" })
+
+local function weapon_pal(id, color)
+  local p = wpal_cache[id]
+  if p then return p end
+  p = {}
+  for k, v in pairs(WBASE) do p[k] = v end
+  p.c = color
+  p.C = { color[1] * 0.62, color[2] * 0.62, color[3] * 0.62 }
+  p.h = { min(1, color[1] * 1.3 + 0.1), min(1, color[2] * 1.3 + 0.1), min(1, color[3] * 1.3 + 0.1) }
+  wpal_cache[id] = p
+  return p
+end
+
+-- disegna l'arma con l'impugnatura nell'origine; centered: centrata (armi a terra, interfaccia)
+local function draw_weapon_shape(id, color, centered, alpha)
+  local wa = WeaponArt[id]
+  alpha = alpha or 1
+  if wa and wa.custom and id == "shield" then
+    -- scudo a goccia: bordo di metallo, colore dell'arma, stemma d'oro
+    local c = color
+    lg.setColor(0.08, 0.06, 0.08, alpha)
+    lg.polygon("fill", 1, -10, 9, -10, 9, 3, 5, 10, 1, 3)
+    lg.setColor(0.6, 0.62, 0.68, alpha)
+    lg.polygon("fill", 1.5, -9.5, 8.5, -9.5, 8.5, 2.8, 5, 9.2, 1.5, 2.8)
+    lg.setColor(c[1], c[2], c[3], alpha)
+    lg.polygon("fill", 2.5, -8.5, 7.5, -8.5, 7.5, 2.5, 5, 7.8, 2.5, 2.5)
+    lg.setColor(c[1] * 0.65, c[2] * 0.65, c[3] * 0.65, alpha)
+    lg.polygon("fill", 5, -8.5, 7.5, -8.5, 7.5, 2.5, 5, 7.8)
+    lg.setColor(0.95, 0.78, 0.25, alpha)
+    lg.rectangle("fill", 4.5, -6, 1, 9); lg.rectangle("fill", 3, -3, 4, 1)
+    lg.setColor(1, 1, 1, 0.35 * alpha); lg.rectangle("fill", 2.5, -8.5, 5, 0.5)
+    return
   end
+  if wa then
+    local w, h = Art.size(wa.grid)
+    local ox, oy = -wa.gx * 0.5, -wa.gy * 0.5
+    if centered then ox, oy = -w * 0.25, -h * 0.25 end
+    Art.draw(wa.grid, weapon_pal(id, color), ox, oy, 0.5, (wa.alpha or 1) * alpha)
+    return
+  end
+  lg.setColor(color[1], color[2], color[3], alpha)
+  lg.rectangle("fill", 2, -1, 8, 2)
+end
+Render.draw_weapon_shape = draw_weapon_shape
+
+Render.draw_weapon = function(id) local d = data.weapons[id]; draw_weapon_shape(id, d and d.color or { 1, 1, 1 }, true) end
+
+-- mano che impugna l'arma (colore del pelo dell'eroe), nell'origine della trasformazione corrente
+local function draw_hand(p, ox)
+  local lo = Look.loadout[p.id] or {}
+  local c = Heroes.hand_color(lo.hero or "gatto", lo.skin or 1)
+  ox = ox or 0
+  lg.setColor(0.05, 0.04, 0.07)
+  lg.rectangle("fill", ox - 1.5, -1.5, 3, 3)
+  lg.setColor(c[1], c[2], c[3])
+  lg.rectangle("fill", ox - 1, -1, 2, 2)
 end
 
 local function draw_held_weapon(p, game)
@@ -301,6 +247,7 @@ local function draw_held_weapon(p, game)
     lg.rotate(ang)
     lg.translate(-floor(Fx.pstate(p.id).recoil + 0.5), 0)
     draw_weapon_shape(def.id, def.color)
+    draw_hand(p)
   elseif p.weapon then
     lg.scale(p.facing, 1)
     local ang = (def.id == "shield") and 0 or 1.0
@@ -322,6 +269,7 @@ local function draw_held_weapon(p, game)
     end
     lg.rotate(ang)
     draw_weapon_shape(def.id, def.color)
+    draw_hand(p)
   else
     -- pugni
     lg.scale(p.facing, 1)
@@ -330,8 +278,8 @@ local function draw_held_weapon(p, game)
       if a.phase == "active" then reach = 11
       elseif a.phase == "startup" then reach = 1 end
     end
-    lg.setColor(p.color[1] * 0.6 + 0.4, p.color[2] * 0.6 + 0.4, p.color[3] * 0.6 + 0.4)
-    lg.rectangle("fill", reach, -2, 4, 4)
+    lg.scale(1.4, 1.4)
+    draw_hand(p, reach / 1.4 + 1)
   end
   lg.pop()
   -- effetto del colpo in mischia
@@ -553,9 +501,8 @@ local function draw_items(game, time)
       lg.setColor(r.color[1], r.color[2], r.color[3], 0.35 + 0.2 * sin(time * 6))
       lg.rectangle("fill", x - 7, y - 11, 14, 11)
       lg.push()
-      lg.translate(x - 7, y - 5)
-      lg.scale(0.85, 0.85)
-      draw_weapon_shape(def.id, def.color)
+      lg.translate(x, y - 6)
+      draw_weapon_shape(def.id, def.color, true)
       lg.pop()
       lg.setColor(r.color[1], r.color[2], r.color[3])
       lg.rectangle("line", x - 7.5, y - 11.5, 15, 12)
@@ -612,26 +559,21 @@ local function draw_hazards(game, time)
         lg.rectangle("fill", x - 0.5, h.y0 + 10, 1, 1)
       end
     elseif h.kind == "rocks" then
+      -- scia di polvere e masso che rotola
+      lg.setColor(0.6, 0.55, 0.5, 0.25)
+      lg.circle("fill", x, h.y - 8, 4); lg.circle("fill", x, h.y - 15, 3)
       lg.push()
       lg.translate(x, h.y)
       lg.rotate(time * 4 + h.x)
-      lg.setColor(0.08, 0.07, 0.07)
-      lg.polygon("fill", -7, -3, -3, -7, 4, -6, 7, -1, 5, 6, -2, 7, -7, 3)
-      lg.setColor(0.52, 0.47, 0.42)
-      lg.polygon("fill", -6, -3, -3, -6, 4, -5, 6, -1, 4, 5, -2, 6, -6, 3)
-      lg.setColor(0.68, 0.63, 0.58)
-      lg.polygon("fill", -3, -5, 3, -4, 0, -1)
+      Art.draw(Art.ROCK, Art.ROCK_PAL, -5, -4.25, 0.5)
       lg.pop()
     else
-      lg.setColor(0.08, 0.05, 0.05)
-      lg.rectangle("fill", x - 6, h.y - 7, 12, 14, 2, 2)
-      lg.setColor(0.75, 0.2, 0.15)
-      lg.rectangle("fill", x - 5, h.y - 6, 10, 12, 2, 2)
-      lg.setColor(0.95, 0.8, 0.2)
-      lg.rectangle("fill", x - 5, h.y - 2, 10, 3)
-      lg.setColor(0.1, 0.1, 0.1)
-      lg.rectangle("fill", x - 1, h.y - 2, 2, 3)
-      if floor(time * 10) % 2 == 0 then lg.setColor(1, 0.3, 0.2); lg.rectangle("fill", x - 1, h.y - 8, 2, 2) end
+      lg.push()
+      lg.translate(x, h.y)
+      lg.rotate(sin(time * 6 + h.x) * 0.25)
+      Art.draw(Art.BARREL, Art.BARREL_PAL, -5, -4.25, 0.5)
+      if floor(time * 10) % 2 == 0 then lg.setColor(1, 0.3, 0.2); lg.rectangle("fill", -1, -6, 2, 2) end
+      lg.pop()
     end
   end
 end
