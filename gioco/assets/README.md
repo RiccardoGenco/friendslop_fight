@@ -14,8 +14,11 @@ Se esiste `assets/heroes/<eroe>_<skin>.png` l'eroe usa quell'immagine invece del
 Con il file `.lua` accanto (`{ fw, fh, ox, frames }`) l'immagine e' un foglio di pose in fila:
 fermo, corsa 1, corsa 2, salto, caduta, scatto. Il codice aggiunge respiro, passo, inclinazione e contorno del colore del giocatore.
 
-Per creare un foglio da una generazione con sfondo trasparente (sei pose in una riga):
-
-    python3 tools/foglio_pose.py generazione.png assets/heroes/gatto_1.png 52
-
-52 e' l'altezza in pixel della posa ferma (il gioco la disegna a mezzo pixel: circa 26 pixel del mondo).
+Come si fanno gli eroi (metodo corretto, con pixel netti):
+1. Si generano due immagini larghe 1792x896 con sfondo trasparente: la prima con tre pose a terra
+   (fermo, corsa 1, corsa 2), la seconda con tre pose in aria (salto, caduta, scatto) usando la prima
+   come riferimento, cosi' il personaggio resta identico.
+2. `tools/unisci_pose.py <eroe> <variante a> <variante b>` separa le pose, toglie ombre e linee di terra,
+   trova la griglia vera dei pixel del modello (`tools/griglia_pixel.py`: tagli dove i colori cambiano,
+   colore dominante per cella) e tiene la risoluzione nativa, senza stirare.
+3. Le skin si fanno per scambio di palette (`tools/skin_palette.py`): stesse pose, colori nuovi.

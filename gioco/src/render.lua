@@ -524,36 +524,36 @@ local function draw_player(p, game, time)
   end
   if p.clash > 0 then
     lg.setColor(1, 1, 0.5, 0.9)
-    lg.print("*", x - 3, y - 36)
+    lg.print("*", x - 3, y - 52)
   end
 
   -- barre sopra la testa
   local bx = x - 8
   lg.setColor(0, 0, 0, 0.7)
-  lg.rectangle("fill", bx - 1, y - 30, 18, 4)
+  lg.rectangle("fill", bx - 1, y - 37, 18, 4)
   lg.setColor(0.2, 0.2, 0.2)
-  lg.rectangle("fill", bx, y - 29, 16, 2)
+  lg.rectangle("fill", bx, y - 36, 16, 2)
   local hpf = max(0, p.hp) / data.player.hp
   -- danno appena subito: tratto bianco che si consuma dopo un attimo
   local chipf = max(0, ps.chip or p.hp) / data.player.hp
   if chipf > hpf then
     lg.setColor(1, 1, 1, 0.9)
-    lg.rectangle("fill", bx + 16 * hpf, y - 29, 16 * (chipf - hpf), 2)
+    lg.rectangle("fill", bx + 16 * hpf, y - 36, 16 * (chipf - hpf), 2)
   end
   -- vita bassa: la barra lampeggia
   if hpf < 0.3 and floor(time * 6) % 2 == 0 then lg.setColor(1, 0.95, 0.9)
   else lg.setColor(1 - hpf, 0.3 + 0.7 * hpf, 0.25) end
-  lg.rectangle("fill", bx, y - 29, 16 * hpf, 2)
+  lg.rectangle("fill", bx, y - 36, 16 * hpf, 2)
   local mf = min(1, p.momentum / data.momentum.max)
   lg.setColor(0, 0, 0, 0.6)
-  lg.rectangle("fill", bx, y - 26, 16, 2)
+  lg.rectangle("fill", bx, y - 33, 16, 2)
   local tier = Player.tier(p)
   if tier == 2 then lg.setColor(1, 0.85, 0.2)
   elseif tier == 1 then lg.setColor(0.8, 0.9, 0.4) else lg.setColor(0.6, 0.6, 0.6) end
-  lg.rectangle("fill", bx, y - 26, 16 * mf, 2)
+  lg.rectangle("fill", bx, y - 33, 16 * mf, 2)
   -- indicatore giocatore
   lg.setColor(c[1], c[2], c[3])
-  lg.polygon("fill", x - 3, y - 37, x + 3, y - 37, x, y - 33)
+  lg.polygon("fill", x - 3, y - 44, x + 3, y - 44, x, y - 40)
 end
 
 -- ---------------------------------------------------------------------------
