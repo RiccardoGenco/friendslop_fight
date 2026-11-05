@@ -10,6 +10,7 @@ local RNG = require("src.sim.rng")
 local World = require("src.sim.world")
 local Player = require("src.sim.player")
 local Combat = require("src.sim.combat")
+local MapEvents = require("src.sim.mapevents")
 
 local Game = {}
 Game.__index = Game
@@ -107,6 +108,7 @@ function Game:start_round(forced_map)
   self.spawn_timer = self.rng:int(R.spawn_min, R.spawn_max)
   self.crate_timer = self.rng:int(R.crate_min, R.crate_max)
   self.winners = {}
+  MapEvents.reset(self)
   self:emit("round_setup", 0, 0, { round = self.round, map = world.name })
 end
 
@@ -381,6 +383,7 @@ function Game:update(inputs)
     self:update_pickups()
     self:update_hazards()
     self:update_lava()
+    MapEvents.update(self)
     self:update_spawner()
     self:check_round_end()
   elseif ph == "roundend" then

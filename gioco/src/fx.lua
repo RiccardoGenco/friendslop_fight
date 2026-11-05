@@ -5,13 +5,14 @@
 local Audio = require("src.audio")
 
 local Fx = { particles = {}, ghosts = {}, rings = {}, shake = 0,
-             freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {} }
+             freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {}, bolts = {}, banner = nil }
 
 local function rnd(a, b) return a + love.math.random() * (b - a) end
 
 function Fx.reset()
   Fx.particles, Fx.ghosts, Fx.rings, Fx.shake = {}, {}, {}, 0
   Fx.freeze, Fx.kx, Fx.ky, Fx.flash, Fx.flashes, Fx.pl = 0, 0, 0, 0, {}, {}
+  Fx.bolts, Fx.banner = {}, nil
 end
 
 function Fx.add_shake(v)
@@ -290,6 +291,24 @@ function Fx.handle(e, game)
   elseif t == "item_spawn" then
     Fx.burst(e.x, e.y, { 1, 1, 0.7 }, 8, 80, 0.3, 0)
     Audio.play("spawn")
+  elseif t == "map_event" then
+    local names = { rocks = "FRANA!", barrels = "BARILI IN ARRIVO!", lightning = "TEMPESTA!" }
+    Fx.banner = { text = names[e.kind] or "ATTENZIONE!", t = 1.6 }
+    Audio.play("telegraph", 0.6)
+    Audio.play("telegraph", 0.45, 0.6)
+  elseif t == "lightning" then
+    Fx.bolts[#Fx.bolts + 1] = { x = e.x, y1 = e.y1 or 0, y2 = e.y, life = 0.22, max = 0.22 }
+    Fx.burst(e.x, e.y, { 0.8, 0.9, 1 }, 18, 200, 0.35, 200, 2)
+    Fx.flash = math.max(Fx.flash, 0.3)
+    Fx.add_shake(6)
+    Fx.hitstop(3)
+    Audio.play("explosion", 1.6)
+    Audio.play("sniper", 1.8, 0.7)
+  elseif t == "rock" then
+    Fx.burst(e.x, e.y, { 0.55, 0.5, 0.45 }, 14, 150, 0.5, 400, 2)
+    Fx.burst(e.x, e.y, { 0.7, 0.68, 0.65 }, 8, 60, 0.7, -30, 3)
+    Fx.add_shake(4)
+    Audio.play("break_", 0.6)
   elseif t == "round_start" then
     Audio.play("round_start")
   elseif t == "round_end" then
@@ -314,7 +333,11 @@ function Fx.update(dt)
     r.life = r.life - dt
     if r.life <= 0 then table.remove(Fx.rings, i) end
   end
-  for _, list in ipairs({ Fx.flashes, Fx.ghosts }) do
+  if Fx.banner then
+    Fx.banner.t = Fx.banner.t - dt
+    if Fx.banner.t <= 0 then Fx.banner = nil end
+  end
+  for _, list in ipairs({ Fx.flashes, Fx.ghosts, Fx.bolts }) do
     for i = #list, 1, -1 do
       local f = list[i]
       f.life = f.life - dt
@@ -355,6 +378,27 @@ function Fx.draw()
     local a = math.min(1, p.life / (p.max * 0.5))
     love.graphics.setColor(p.color[1], p.color[2], p.color[3], a)
     love.graphics.rectangle("fill", math.floor(p.x), math.floor(p.y), p.size, p.size)
+  end
+  -- fulmini: linea spezzata che cambia forma a ogni frame
+  for _, b in ipairs(Fx.bolts) do
+    local k = b.life / b.max
+    love.graphics.setBlendMode("add")
+    for pass = 1, 2 do
+      local pts, y, x = {}, b.y1, b.x
+      while y < b.y2 do
+        pts[#pts + 1] = x; pts[#pts + 1] = y
+        y = math.min(b.y2, y + 10 + love.math.random() * 10)
+        x = b.x + (love.math.random() - 0.5) * 14
+      end
+      pts[#pts + 1] = b.x; pts[#pts + 1] = b.y2
+      if #pts >= 4 then
+        love.graphics.setLineWidth(pass == 1 and 6 or 2)
+        love.graphics.setColor(pass == 1 and 0.4 or 1, pass == 1 and 0.6 or 1, 1, (pass == 1 and 0.4 or 1) * k)
+        love.graphics.line(pts)
+      end
+    end
+    love.graphics.setLineWidth(1)
+    love.graphics.setBlendMode("alpha")
   end
   for _, f in ipairs(Fx.flashes) do
     local k = f.life / f.max

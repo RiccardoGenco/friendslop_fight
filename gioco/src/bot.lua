@@ -63,6 +63,13 @@ function Bot.think(game, index)
     inp.mx = sign(dx)
   end
 
+  -- si sposta dalle colonne degli eventi di mappa annunciati
+  for _, h in ipairs(game.hazards or {}) do
+    if abs(h.x - p.x) < 26 and (h.phase ~= "warn" or h.t < 60) then
+      inp.mx = (p.x >= h.x) and 1 or -1
+    end
+  end
+
   -- non corre nel vuoto: se davanti non c'e' terreno si ferma o salta
   if inp.mx ~= 0 and p.grounded then
     local w = game.world

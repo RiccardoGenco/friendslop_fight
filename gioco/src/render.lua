@@ -576,6 +576,63 @@ local function draw_telegraphs(game, time)
   end
 end
 
+-- Eventi di mappa: colonne di avviso e oggetti in caduta
+local function draw_hazards(game, time)
+  for _, h in ipairs(game.hazards or {}) do
+    local x = floor(h.x)
+    if h.phase == "warn" then
+      local k = 1 - min(1, h.t / data.map_events.warn)
+      local fast = h.t < 25
+      local on = floor(time * (fast and 16 or 6)) % 2 == 0
+      local c = h.kind == "lightning" and { 0.6, 0.85, 1 } or (h.kind == "barrels" and { 1, 0.4, 0.2 } or { 1, 0.75, 0.3 })
+      local hw = h.kind == "lightning" and data.map_events.lightning.width / 2 or 7
+      lg.setBlendMode("add")
+      lg.setColor(c[1], c[2], c[3], 0.06 + 0.16 * k)
+      lg.rectangle("fill", x - hw, h.y0, hw * 2, (h.y2 or h.y0 + 200) - h.y0)
+      lg.setBlendMode("alpha")
+      -- tratteggio ai bordi
+      lg.setColor(c[1], c[2], c[3], 0.5 + 0.4 * k)
+      for yy = h.y0, (h.y2 or h.y0) - 6, 12 do
+        lg.rectangle("fill", x - hw, yy + (time * 30) % 12, 1, 5)
+        lg.rectangle("fill", x + hw - 1, yy + (time * 30) % 12, 1, 5)
+      end
+      -- bersaglio sul pavimento e segnale in alto
+      if h.y2 then
+        lg.setColor(c[1], c[2], c[3], 0.4 + 0.5 * k)
+        lg.ellipse("line", x, h.y2, hw + 6 - 4 * k, 3)
+      end
+      if on then
+        lg.setColor(c[1], c[2], c[3])
+        lg.polygon("fill", x, h.y0 + 2, x - 6, h.y0 + 13, x + 6, h.y0 + 13)
+        lg.setColor(0.1, 0.05, 0.05)
+        lg.rectangle("fill", x - 0.5, h.y0 + 5, 1, 4)
+        lg.rectangle("fill", x - 0.5, h.y0 + 10, 1, 1)
+      end
+    elseif h.kind == "rocks" then
+      lg.push()
+      lg.translate(x, h.y)
+      lg.rotate(time * 4 + h.x)
+      lg.setColor(0.08, 0.07, 0.07)
+      lg.polygon("fill", -7, -3, -3, -7, 4, -6, 7, -1, 5, 6, -2, 7, -7, 3)
+      lg.setColor(0.52, 0.47, 0.42)
+      lg.polygon("fill", -6, -3, -3, -6, 4, -5, 6, -1, 4, 5, -2, 6, -6, 3)
+      lg.setColor(0.68, 0.63, 0.58)
+      lg.polygon("fill", -3, -5, 3, -4, 0, -1)
+      lg.pop()
+    else
+      lg.setColor(0.08, 0.05, 0.05)
+      lg.rectangle("fill", x - 6, h.y - 7, 12, 14, 2, 2)
+      lg.setColor(0.75, 0.2, 0.15)
+      lg.rectangle("fill", x - 5, h.y - 6, 10, 12, 2, 2)
+      lg.setColor(0.95, 0.8, 0.2)
+      lg.rectangle("fill", x - 5, h.y - 2, 10, 3)
+      lg.setColor(0.1, 0.1, 0.1)
+      lg.rectangle("fill", x - 1, h.y - 2, 2, 3)
+      if floor(time * 10) % 2 == 0 then lg.setColor(1, 0.3, 0.2); lg.rectangle("fill", x - 1, h.y - 8, 2, 2) end
+    end
+  end
+end
+
 -- Buchi neri: nucleo scuro, polvere che gira verso il centro, bordo del raggio d'azione
 local function draw_fields(game, time)
   for _, f in ipairs(game.fields or {}) do
@@ -715,11 +772,37 @@ local function draw_lava(game, time)
   local W = game.world.width
   local y = game.lava_y
   local h = game.world.height + 200 - y
-  lg.setColor(1, 0.35, 0.1, 0.85)
-  lg.rectangle("fill", 0, y, W, h)
-  lg.setColor(1, 0.7, 0.2, 0.9)
-  for x = 0, W, 8 do
-    lg.rectangle("fill", x, y - 2 + floor(sin(time * 5 + x * 0.3) * 2), 8, 3)
+  -- bagliore sopra la superficie
+  lg.setBlendMode("add")
+  for j = 0, 5 do
+    lg.setColor(1, 0.35, 0.1, 0.05 * (6 - j) / 6)
+    lg.rectangle("fill", 0, y - 12 - j * 10, W, 12)
+  end
+  lg.setBlendMode("alpha")
+  -- strati: crosta scura in profondita', arancio, superficie gialla ondulata
+  lg.setColor(0.55, 0.08, 0.04, 0.95)
+  lg.rectangle("fill", 0, y + 14, W, h)
+  lg.setColor(0.9, 0.25, 0.06, 0.95)
+  lg.rectangle("fill", 0, y + 4, W, 12)
+  for x = 0, W, 6 do
+    local wv = sin(time * 4 + x * 0.12) * 2 + sin(time * 2.3 + x * 0.05) * 2
+    lg.setColor(1, 0.5, 0.1)
+    lg.rectangle("fill", x, y + wv, 6, 6)
+    lg.setColor(1, 0.85, 0.3)
+    lg.rectangle("fill", x, y + wv - 1, 6, 2)
+  end
+  -- bolle che salgono e scoppiano
+  for i = 1, 24 do
+    local ph = (time * (0.6 + (i % 5) * 0.15) + i * 0.37) % 1
+    local bx = (i * 53.7) % W
+    lg.setColor(1, 0.8, 0.3, 1 - ph)
+    lg.circle(ph > 0.8 and "line" or "fill", bx, y + 12 - ph * 10, 1 + ph * 2)
+  end
+  -- braci che volano su
+  for i = 1, 18 do
+    local ph = (time * 0.5 + i * 0.13) % 1
+    lg.setColor(1, 0.6, 0.2, 1 - ph)
+    lg.rectangle("fill", (i * 97.3 + sin(time + i) * 10) % W, y - ph * 60, 1, 1)
   end
 end
 
@@ -769,6 +852,27 @@ local function draw_banner(game, time)
     local wc = (#game.winners > 0) and game.players[game.winners[1]].color or { 1, 1, 1 }
     Render.text(msg, W / 2, H / 2 - 8, wc, "mid", "center", W)
   end
+  if Fx.banner and game.phase == "playing" then
+    local b = Fx.banner
+    local k = min(1, (1.6 - b.t) * 6)
+    local s = 1 + 0.4 * (1 - k)
+    lg.push()
+    lg.translate(W / 2, 64)
+    lg.scale(s)
+    Render.text(b.text, 0, -16, { 1, 0.75, 0.3, min(1, b.t * 2) }, "big", "center", W)
+    lg.pop()
+  end
+  if game.phase == "playing" and (game.lava_on or game.round_frame >= R.sudden_death_warning) then
+    local pulse = (sin(time * (game.lava_on and 3 or 8)) + 1) / 2
+    local a = (game.lava_on and 0.10 or 0.18) * pulse
+    for j = 0, 4 do
+      lg.setColor(1, 0.2, 0.05, a * (5 - j) / 5)
+      lg.rectangle("fill", 0, j * 4, W, 4)
+      lg.rectangle("fill", 0, H - (j + 1) * 4, W, 4)
+      lg.rectangle("fill", j * 4, 0, 4, H)
+      lg.rectangle("fill", W - (j + 1) * 4, 0, 4, H)
+    end
+  end
   if game.phase == "playing" and game.round_frame >= R.sudden_death_warning and not game.lava_on
      and floor(time * 4) % 2 == 0 then
     Render.text("LAVA IN ARRIVO!", W / 2, 28, { 1, 0.4, 0.2 }, "mid", "center", W)
@@ -790,6 +894,7 @@ function Render.game(game, time)
   Fx.draw_under()
   for _, p in ipairs(game.players) do draw_player(p, game, time) end
   draw_fields(game, time)
+  draw_hazards(game, time)
   draw_projectiles(game, time)
   draw_lava(game, time)
   Look.ambient(game.world, time)

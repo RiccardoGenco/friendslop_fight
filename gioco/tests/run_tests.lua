@@ -1155,6 +1155,57 @@ end)
 
 -- --------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Eventi di mappa
+
+local MapEvents = require("src.sim.mapevents")
+
+local function on_map(name)
+  local g = Game.new({ players = 2, seed = 11, first_map = name })
+  start_playing(g)
+  g.items, g.telegraphs = {}, {}
+  g.spawn_timer, g.crate_timer = 1e9, 1e9
+  run(g, 30)
+  return g
+end
+
+test("eventi di mappa: il fulmine colpisce chi sta nella colonna annunciata", function()
+  local g = on_map("tetti")
+  local p1 = g.players[1]
+  local hp = p1.hp
+  g.hazards = { { kind = "lightning", phase = "warn", x = p1.x, y = p1.y - 40, y0 = p1.y - 40, t = 2, vy = 0 } }
+  g.event_timer = 1e9
+  run(g, 3)
+  check(p1.hp < hp or not p1.alive, "il fulmine non ha colpito")
+end)
+
+test("eventi di mappa: i massi cadono e colpiscono", function()
+  local g = on_map("arena")
+  local p1 = g.players[1]
+  local hp = p1.hp
+  g.hazards = { { kind = "rocks", phase = "fall", x = p1.x, y = p1.y - 120, y0 = 0, t = 0, vy = 0 } }
+  g.event_timer = 1e9
+  run(g, 60)
+  check(p1.hp < hp or not p1.alive, "il masso non ha colpito")
+  check(#g.hazards == 0, "il masso non e' sparito")
+end)
+
+test("eventi di mappa: partono da soli e sono deterministici", function()
+  local function play()
+    local g = on_map("fabbrica")
+    local seen = 0
+    for _ = 1, 1500 do
+      g:update({})
+      for _, e in ipairs(g:drain_events()) do if e.type == "map_event" then seen = seen + 1 end end
+    end
+    return seen, g:checksum()
+  end
+  local n1, c1 = play()
+  local n2, c2 = play()
+  check(n1 >= 1, "nessun evento in 25 secondi")
+  check(n1 == n2 and c1 == c2, "non deterministico")
+end)
+
 local function main()
   for _, t in ipairs(tests) do
     local ok, err = pcall(t.fn)

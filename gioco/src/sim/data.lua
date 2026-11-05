@@ -55,6 +55,16 @@ M.player = {
   throw_speed = 340, throw_damage = 20, throw_gravity = 600,
 }
 
+-- Eventi di mappa (src/sim/mapevents.lua). Tempi in frame (60 = 1 secondo).
+M.map_events = {
+  first_min = 600, first_max = 900, every_min = 720, every_max = 1080,
+  warn = 80,                                             -- preavviso prima del colpo
+  rocks = { count = 3, dmg = 25, size = 12, gravity = 900, max_speed = 520 },
+  barrels = { count = 2, size = 12, gravity = 800, max_speed = 480,
+              blast = { radius = 46, dmg = 45, kb = 330, self_mul = 1 } },
+  lightning = { count = 2, dmg = 40, width = 16 },
+}
+
 M.momentum = {
   max = 100, tier1 = 33, tier2 = 66,
   gain_hit = 10, gain_parry = 25, gain_kill = 20, loss_hit = 30,
