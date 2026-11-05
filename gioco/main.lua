@@ -1,0 +1,354 @@
+-- Party Game (prototipo) - punto di ingresso LÖVE.
+-- Avvio:        love .
+-- Test:         love . test
+-- Controlli, strumenti di debug e struttura: vedi README.md
+
+local data = require("src.sim.data")
+local Game = require("src.sim.game")
+local Input = require("src.input")
+local Render = require("src.render")
+local Fx = require("src.fx")
+local Audio = require("src.audio")
+local Sprites = require("src.sprites")
+local Debug = require("src.debug")
+local Bot = require("src.bot")
+
+local lg = love.graphics
+
+local STEP = data.dt
+local state = "lobby"        -- lobby | game | pause | matchend
+local pause_reason = nil
+local game
+local canvas
+local acc, time = 0, 0
+local slow_frames = 0        -- rallentatore dopo l'ultimo colpo del round
+local menu_msg = nil
+local screen = { ox = 0, oy = 0, s = 2 }   -- trasformazione schermo -> coordinate virtuali
+
+-- ---------------------------------------------------------------------------
+
+function love.load(args)
+  if args and args[1] == "test" then
+    local ok, run = pcall(require, "tests.run_tests")
+    if not ok then
+      print("impossibile caricare i test: " .. tostring(run))
+      love.event.quit(1)
+      return
+    end
+    local failed = run()
+    love.event.quit(failed > 0 and 1 or 0)
+    return
+  end
+
+  lg.setDefaultFilter("nearest", "nearest")
+  canvas = lg.newCanvas(Render.W * Render.SS, Render.H * Render.SS)
+  canvas:setFilter("nearest", "nearest")
+  Render.load()
+  Audio.load()
+  Sprites.load()
+  love.mouse.setVisible(false)
+end
+
+-- accesso alla partita per la prova a secco (tests/smoke_love.lua)
+function __smoke_game() return game end
+
+local function new_seed()
+  return math.floor(os.time() + love.timer.getTime() * 1000) % 2147483646
+end
+
+local function start_game()
+  game = Game.new({ players = Input.count(), seed = new_seed() })
+  Fx.reset()
+  Input.clear_pending()
+  acc, slow_frames = 0, 0
+  state = "game"
+end
+
+-- Con meno di 2 giocatori aggiunge dei bot (e la tastiera 1 se non c'e' nessuno)
+local function fill_and_start()
+  if Input.count() == 0 then Input.add_keyboard(1) end
+  while Input.count() < 3 do Input.add_bot() end
+  start_game()
+end
+
+local function to_lobby()
+  state = "lobby"
+  game = nil
+  Fx.reset()
+  menu_msg = nil
+end
+
+local function step()
+  local inputs = {}
+  for i, s in ipairs(Input.slots) do
+    if s.kind == "bot" then
+      inputs[i] = Bot.think(game, i)
+    else
+      inputs[i] = Input.consume(s)
+      -- tastiera 1: mira col mouse (se il mouse e' stato usato)
+      if s.kind == "kb" and s.kb == 1 and Input.mouse.active then
+        local p = game.players[i]
+        if p and p.alive then
+          local vx = (Input.mouse.x - screen.ox) / screen.s
+          local vy = (Input.mouse.y - screen.oy) / screen.s
+          local wx, wy = Render.to_world(vx, vy)
+          local dx, dy = wx - p.x, wy - (p.y - 12)
+          local len = math.sqrt(dx * dx + dy * dy)
+          if len > 4 then inputs[i].ax, inputs[i].ay = dx / len, dy / len end
+        end
+      end
+    end
+  end
+  game:update(inputs)
+  for _, e in ipairs(game:drain_events()) do
+    Fx.handle(e, game)
+    if e.type == "round_end" then slow_frames = 80 end
+  end
+  Fx.track(game)
+  if slow_frames > 0 then slow_frames = slow_frames - 1 end
+  if game.phase == "matchend" then state = "matchend" end
+end
+
+-- ---------------------------------------------------------------------------
+
+function love.update(dt)
+  dt = math.min(dt, 0.1)
+  time = time + dt
+  Input.poll()
+  Debug.update(dt)
+
+  if state == "lobby" then
+    if Input.start_pressed() and Input.count() >= 1 then fill_and_start() end
+  elseif state == "game" then
+    if Input.start_pressed() then
+      state, pause_reason = "pause", "pausa"
+    elseif Input.any_disconnected() then
+      state, pause_reason = "pause", "disconnesso"
+    elseif Debug.paused then
+      if Debug.consume_step() then step() end
+    else
+      local scale = 1
+      if Debug.slowmo then scale = 0.25 end
+      if slow_frames > 0 then scale = math.min(scale, 0.4) end
+      acc = math.min(acc + dt * scale, 0.25)
+      while acc >= STEP do
+        -- hitstop: per qualche frame il mondo si ferma, poi riparte
+        if Fx.freeze > 0 then Fx.freeze = Fx.freeze - 1 else step() end
+        acc = acc - STEP
+        if state ~= "game" then break end
+      end
+    end
+    if game then Render.update_camera(game, dt) end
+  elseif state == "pause" then
+    if Input.start_pressed() and not Input.any_disconnected() then
+      state = "game"
+      Input.clear_pending()
+    end
+  elseif state == "matchend" then
+    local _ = Input.start_pressed()
+    Render.update_camera(game, dt)
+    -- l'animazione continua per qualche istante
+    game:update({})
+    game:drain_events()
+  end
+  Fx.update(dt)
+end
+
+-- ---------------------------------------------------------------------------
+-- Schermate
+
+local function draw_lobby()
+  local W, H = Render.W, Render.H
+  for i = 0, 11 do
+    lg.setColor(0.05 + 0.04 * i / 11, 0.06 + 0.03 * i / 11, 0.12 + 0.08 * i / 11)
+    lg.rectangle("fill", 0, i * 30, W, 30)
+  end
+  Render.text("PARTY GAME", W / 2, 22, { 1, 0.9, 0.3 }, "big", "center", W)
+  Render.text("prototipo v0.3 - 2-6 giocatori, ultimo in piedi vince", W / 2, 62, { 0.8, 0.85, 1 }, "small", "center", W)
+
+  for i = 1, 6 do
+    local x = 40 + ((i - 1) % 3) * 190
+    local y = 90 + math.floor((i - 1) / 3) * 70
+    local s = Input.slots[i]
+    local c = data.colors[i]
+    lg.setColor(c[1], c[2], c[3], s and 1 or 0.18)
+    lg.rectangle("fill", x, y, 170, 56)
+    lg.setColor(0, 0, 0, s and 0.55 or 0.7)
+    lg.rectangle("fill", x + 2, y + 2, 166, 52)
+    if s then
+      Render.text(data.color_names[i], x + 10, y + 8, c, "mid")
+      Render.text(s.name or "", x + 10, y + 30, { 1, 1, 1 }, "small")
+      if s.kind == "pad" then
+        Render.text("B per uscire", x + 10, y + 41, { 0.6, 0.6, 0.7 }, "small")
+      end
+    else
+      Render.text("libero", x + 10, y + 20, { 0.5, 0.5, 0.6 }, "mid")
+    end
+  end
+
+  local n = Input.count()
+  if n >= 2 then
+    Render.text("START (o Invio) per iniziare", W / 2, 238, { 0.5, 1, 0.5 }, "mid", "center", W)
+  elseif n == 1 then
+    Render.text("START (o Invio): parti da solo contro 2 bot", W / 2, 238, { 0.5, 1, 0.5 }, "mid", "center", W)
+  else
+    Render.text("Invio: tastiera + 2 bot   oppure premi un tasto del controller", W / 2, 238, { 1, 1, 1 }, "mid", "center", W)
+  end
+  Render.text("F1/F2 tastiera   F10 aggiungi bot   Esc esci", W / 2, 266, { 0.6, 0.7, 0.9 }, "small", "center", W)
+  Render.text("Controller: levetta sinistra muovi, levetta destra mira, A salta, X/RT attacco,",
+    W / 2, 280, { 0.6, 0.7, 0.9 }, "small", "center", W)
+  Render.text("B scatto, LB/RB/LT parry, Y raccogli/lancia.  Tastiera 1: WASD + mouse (click attacca)",
+    W / 2, 290, { 0.6, 0.7, 0.9 }, "small", "center", W)
+  Render.text("Giu + salto su una piattaforma: scendi", W / 2, 300, { 0.6, 0.7, 0.9 }, "small", "center", W)
+  Render.text("In gioco: F3 hitbox  F4 slow  F5 pausa  F6 frame  F7 ricarica dati  F8 taratura",
+    W / 2, 316, { 0.5, 0.6, 0.75 }, "small", "center", W)
+  if menu_msg then Render.text(menu_msg, W / 2, 338, { 1, 0.6, 0.4 }, "small", "center", W) end
+  if not Sprites.player then
+    Render.text("sprite: nessuno (rettangoli colorati) - vedi assets/README.md", W / 2, 348, { 0.5, 0.55, 0.65 }, "small", "center", W)
+  end
+end
+
+local function draw_overlay_pause()
+  local W, H = Render.W, Render.H
+  lg.setColor(0, 0, 0, 0.6)
+  lg.rectangle("fill", 0, 0, W, H)
+  if pause_reason == "disconnesso" then
+    local i, s = Input.any_disconnected()
+    Render.text("CONTROLLER SCOLLEGATO", W / 2, H / 2 - 30, { 1, 0.5, 0.4 }, "mid", "center", W)
+    Render.text((s and s.name or "") .. " (giocatore " .. tostring(i) .. ")", W / 2, H / 2 - 6, { 1, 1, 1 }, "small", "center", W)
+    Render.text("Ricollegalo per continuare", W / 2, H / 2 + 10, { 0.8, 0.8, 0.9 }, "small", "center", W)
+  else
+    Render.text("PAUSA", W / 2, H / 2 - 30, { 1, 0.9, 0.3 }, "big", "center", W)
+    Render.text("START o Esc per riprendere   -   Q torna alla lobby", W / 2, H / 2 + 10, { 0.8, 0.8, 0.9 }, "small", "center", W)
+  end
+end
+
+local function draw_overlay_matchend()
+  local W, H = Render.W, Render.H
+  lg.setColor(0, 0, 0, 0.55)
+  lg.rectangle("fill", 0, 0, W, H)
+  local names = {}
+  for _, id in ipairs(game.match_winners or {}) do names[#names + 1] = data.color_names[id] end
+  local c = game.match_winners and data.colors[game.match_winners[1]] or { 1, 1, 1 }
+  Render.text("VINCE " .. string.upper(table.concat(names, " e ")) .. "!", W / 2, 90, c, "big", "center", W)
+  for i = 1, #game.players do
+    Render.text(data.color_names[i] .. ": " .. game.scores[i], W / 2, 140 + (i - 1) * 16, data.colors[i], "mid", "center", W)
+  end
+  Render.text("A / Invio: rivincita      B / Esc: lobby", W / 2, 285, { 0.9, 0.9, 1 }, "small", "center", W)
+end
+
+-- mirino del mouse (tastiera 1)
+local function draw_crosshair()
+  if not (Input.mouse.active and Input.has_keyboard(1)) then return end
+  local x = (Input.mouse.x - screen.ox) / screen.s
+  local y = (Input.mouse.y - screen.oy) / screen.s
+  lg.setColor(1, 1, 1, 0.9)
+  lg.rectangle("fill", x - 5, y - 0.5, 3, 1)
+  lg.rectangle("fill", x + 2, y - 0.5, 3, 1)
+  lg.rectangle("fill", x - 0.5, y - 5, 1, 3)
+  lg.rectangle("fill", x - 0.5, y + 2, 1, 3)
+  lg.setColor(1, 1, 1, 1)
+end
+
+function love.draw()
+  if not canvas then return end
+  lg.setCanvas(canvas)
+  lg.clear(0, 0, 0, 1)
+  lg.push()
+  lg.scale(Render.SS)
+  if state == "lobby" then
+    draw_lobby()
+  elseif game then
+    lg.push()
+    local ox, oy = Fx.offset()
+    lg.translate(ox, oy)
+    Render.game(game, time)
+    lg.pop()
+    if state == "pause" then draw_overlay_pause() end
+    if state == "matchend" then draw_overlay_matchend() end
+    Debug.draw(game, love.timer.getFPS())
+    draw_crosshair()
+  end
+  lg.pop()
+  lg.setCanvas()
+
+  local cw, ch = Render.W * Render.SS, Render.H * Render.SS
+  local sw, sh = lg.getDimensions()
+  local s = math.min(sw / cw, sh / ch)
+  if s >= 1 then s = math.floor(s) end
+  local ox = math.floor((sw - cw * s) / 2)
+  local oy = math.floor((sh - ch * s) / 2)
+  screen = { ox = ox, oy = oy, s = s * Render.SS }   -- da pixel dello schermo a coordinate virtuali
+  lg.clear(0, 0, 0, 1)
+  lg.setColor(1, 1, 1, 1)
+  lg.draw(canvas, ox, oy, 0, s, s)
+end
+
+-- ---------------------------------------------------------------------------
+-- Eventi
+
+function love.mousemoved(x, y)
+  Input.mouse.x, Input.mouse.y = x, y
+  Input.mouse.active = true
+end
+
+function love.mousepressed(x, y, button)
+  Input.mouse.x, Input.mouse.y = x, y
+  Input.mouse.active = true
+  Input.mouse_button(button)
+end
+
+function love.joystickadded(joy)
+  Input.joystick_added(joy)
+end
+
+function love.joystickremoved(joy)
+  Input.joystick_removed(joy)
+end
+
+function love.joystickpressed(joy, button)
+  if state == "lobby" then
+    if not Input.has_joystick(joy) then
+      if joy:isGamepad() then
+        Input.add_joystick(joy)
+        menu_msg = nil
+      else
+        menu_msg = "Controller non riconosciuto come gamepad standard (SDL)"
+      end
+    elseif joy:isGamepadDown("b") then
+      Input.remove_joystick(joy)
+    end
+  elseif state == "matchend" then
+    if joy:isGamepadDown("a") then start_game()
+    elseif joy:isGamepadDown("b") then to_lobby() end
+  end
+end
+
+function love.keypressed(key)
+  if state == "game" or state == "pause" then
+    if Debug.keypressed(key) then return end
+  end
+  if key == "f11" then
+    love.window.setFullscreen(not love.window.getFullscreen())
+    return
+  end
+  if state == "lobby" then
+    if key == "f1" then Input.add_keyboard(1)
+    elseif key == "f2" then Input.add_keyboard(2)
+    elseif key == "f10" then Input.add_bot()
+    elseif key == "backspace" then Input.remove_last()
+    elseif key == "return" then
+      if Input.count() >= 2 then start_game() else fill_and_start() end
+    elseif key == "escape" then love.event.quit() end
+  elseif state == "game" then
+    if key == "escape" then state, pause_reason = "pause", "pausa" end
+  elseif state == "pause" then
+    if key == "escape" and not Input.any_disconnected() then
+      state = "game"
+      Input.clear_pending()
+    elseif key == "q" then to_lobby() end
+  elseif state == "matchend" then
+    if key == "return" then start_game()
+    elseif key == "escape" then to_lobby() end
+  end
+end
