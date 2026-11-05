@@ -61,70 +61,199 @@ function Look.theme(world) return THEMES[world.name] or DEFAULT end
 -- ---------------------------------------------------------------------------
 -- Tile
 
+-- ---------------------------------------------------------------------------
+-- Mattonelle a doppia densita' (mezzo pixel del mondo), luce da sinistra in alto.
+-- hp(x, y, w, h) disegna in mezzi pixel dentro la mattonella corrente.
+
+local TX, TY = 0, 0
+local function hp(x0, y0, w0, h0) rect(TX + x0 * 0.5, TY + y0 * 0.5, w0 * 0.5, h0 * 0.5) end
+local function tone(c, k, a) lg.setColor(min(1, c[1] * k), min(1, c[2] * k), min(1, c[3] * k), a or 1) end
+
+-- distanza (in mattonelle, fino a 4) dalla casella libera piu' vicina: piu' e' profonda, piu' e' scura
+local function depth(w, c, r)
+  for d = 1, 3 do
+    for dr = -d, d do
+      for dc = -d, d do
+        if w:tile(c + dc, r + dr) ~= "#" then return d end
+      end
+    end
+  end
+  return 4
+end
+local DEPTH_K = { 1, 0.82, 0.68, 0.58 }
+
+local function tex_brick(s, k, c, r, small)
+  local bw, bh = small and 8 or 16, small and 4 or 8
+  tone(s, k * 0.5); hp(0, 0, 32, 32)                          -- malta
+  for j = 0, 32 / bh - 1 do
+    local row = (r - 1) * (32 / bh) + j
+    local off = (row % 2 == 0) and 0 or bw / 2
+    for bx = -bw, 32, bw do
+      local X = bx + off
+      local x0, x1 = math.max(0, X), math.min(32, X + bw - 1)
+      if x1 > x0 then
+        local id = floor(((c - 1) * 32 + X) / bw)
+        local v = 0.86 + 0.24 * hash(id, row)
+        local y0 = j * bh
+        tone(s, k * v); hp(x0, y0, x1 - x0, bh - 1)
+        tone(s, k * v * 1.18); hp(x0, y0, x1 - x0, 1)
+        if X >= 0 then hp(x0, y0, 1, bh - 1) end
+        tone(s, k * v * 0.78); hp(x0, y0 + bh - 2, x1 - x0, 1)
+        if not small and hash(id * 3, row) > 0.9 then
+          tone(s, k * 0.45)
+          local cx = x0 + 3 + floor(hash(id, row * 2) * 6)
+          hp(cx, y0 + 1, 1, 2); hp(cx + 1, y0 + 3, 1, 2); hp(cx, y0 + 5, 1, 1)
+        end
+      end
+    end
+  end
+end
+
+local function tex_panel(s, k, c, r)
+  tone(s, k); hp(0, 0, 32, 32)
+  tone(s, k * 1.12); hp(3, 3, 26, 26)
+  tone(s, k * 1.3); hp(0, 0, 32, 1); hp(0, 0, 1, 32)
+  tone(s, k * 0.55); hp(0, 31, 32, 1); hp(31, 0, 1, 32)
+  tone(s, k * 0.75); hp(3, 28, 26, 1); hp(28, 3, 1, 26)
+  for _, q in ipairs({ { 4, 4 }, { 26, 4 }, { 4, 26 }, { 26, 26 } }) do
+    tone(s, k * 0.5); hp(q[1], q[2], 2, 2)
+    tone(s, k * 1.6); hp(q[1], q[2], 1, 1)
+  end
+  local hv = hash(c * 7, r * 13)
+  if hv < 0.18 then
+    -- griglia di ventilazione
+    tone(s, k * 0.35)
+    for yy = 10, 20, 4 do hp(9, yy, 14, 2) end
+    tone(s, k * 1.4)
+    for yy = 12, 22, 4 do hp(9, yy, 14, 1) end
+  elseif hv > 0.85 then
+    -- colatura di ruggine da un rivetto
+    lg.setColor(0.55, 0.3, 0.14, 0.55 * k)
+    hp(26, 6, 2, 10); hp(27, 16, 1, 6)
+  elseif hv > 0.78 then
+    lg.setColor(0.95, 0.75, 0.15, k)
+    hp(11, 11, 10, 10)
+    lg.setColor(0.1, 0.1, 0.1, k)
+    hp(15, 13, 2, 4); hp(15, 18, 2, 2)
+  end
+end
+
+local function tex_rock(s, k, c, r)
+  tone(s, k * 0.62); hp(0, 0, 32, 32)
+  for i = 1, 7 do
+    local sx = floor(hash(c * 13 + i, r * 7) * 26)
+    local sy = floor(hash(r * 11 + i, c * 5) * 26)
+    local sw = 6 + floor(hash(c + i * 3, r) * 8)
+    local sh = 5 + floor(hash(r + i * 5, c) * 6)
+    local v = 0.85 + 0.3 * hash(c * i, r + i)
+    tone(s, k * v * 0.7); hp(sx + 1, sy + 1, sw, sh)
+    tone(s, k * v); hp(sx, sy, sw, sh)
+    tone(s, k * v * 1.25); hp(sx + 1, sy, sw - 2, 1); hp(sx, sy + 1, 1, sh - 2)
+  end
+  local hv = hash(c * 3, r * 17)
+  if hv > 0.88 then
+    lg.setColor(1, 0.8, 0.3, k)                                  -- vena d'oro
+    hp(10, 14, 3, 2); hp(13, 15, 2, 1); hp(15, 16, 3, 2)
+    lg.setColor(1, 1, 0.7, k); hp(11, 14, 1, 1)
+  elseif hv < 0.06 then
+    lg.setColor(0.5, 0.85, 1, k)                                  -- cristallo
+    hp(18, 10, 2, 5); hp(20, 12, 2, 3)
+    lg.setColor(0.9, 1, 1, k); hp(18, 10, 1, 2)
+  end
+end
+
+local function tex_building(s, k, c, r, interior)
+  tex_brick(s, k, c, r, true)
+  -- finestre nelle parti interne dei palazzi
+  if interior and hash(c * 5, r * 3) < 0.35 then
+    local lit = hash(c, r * 9) > 0.45
+    lg.setColor(0.08, 0.06, 0.07); hp(7, 5, 18, 22)
+    tone(s, 1.25); hp(7, 5, 18, 2)
+    if lit then lg.setColor(1, 0.82, 0.45) else lg.setColor(0.12, 0.16, 0.28) end
+    hp(9, 8, 6, 8); hp(17, 8, 6, 8); hp(9, 18, 6, 7); hp(17, 18, 6, 7)
+    if lit then lg.setColor(1, 0.95, 0.75) else lg.setColor(0.3, 0.38, 0.55) end
+    hp(9, 8, 2, 1); hp(17, 8, 2, 1)
+  end
+end
+
 local function draw_solid(w, th, c, r, x, y, anims)
   local function open(dc, dr) return w:tile(c + dc, r + dr) ~= "#" end
   local up, dn, lf, rt = open(0, -1), open(0, 1), open(-1, 0), open(1, 0)
-  local near = up or dn or lf or rt or open(-1, -1) or open(1, -1) or open(-1, 1) or open(1, 1)
-  local deep = not near and not (open(0, -2) or open(0, 2) or open(-2, 0) or open(2, 0))
-  local k = deep and 0.55 or (near and 0.9 or 0.72)
+  local d = depth(w, c, r)
+  local k = DEPTH_K[d]
   local s = th.stone
-  col(s, k * (0.95 + 0.1 * hash(c, r)))
-  rect(x, y, T, T)
+  TX, TY = x, y
   local p = th.pattern
-  if p == "brick" then
-    col(s, k * 0.68)
-    rect(x, y + 7, T, 1); rect(x, y + 15, T, 1)
-    local o = (r % 2 == 0) and 0 or 8
-    rect(x + (3 + o) % 16, y, 1, 7); rect(x + (11 + o) % 16, y + 8, 1, 7)
-    if hash(c * 2, r) > 0.6 then col(s, k * 1.12); rect(x + 1, y + 1, 5, 1) end
-  elseif p == "panel" then
-    col(s, k * 0.65)
-    lg.rectangle("line", x + 0.5, y + 0.5, T - 1, T - 1)
-    col(s, k * 1.35)
-    rect(x + 2, y + 2, 1, 1); rect(x + 13, y + 2, 1, 1); rect(x + 2, y + 13, 1, 1); rect(x + 13, y + 13, 1, 1)
-    if hash(c, r * 3) > 0.7 then col(s, k * 0.8); rect(x + 4, y + 6, 8, 4) end
-  elseif p == "roof" then
-    col(s, k * 0.7)
-    for yy = 3, 15, 4 do rect(x, y + yy, T, 1) end
-    col(s, k * 1.12)
-    local o = (r % 2) * 2
-    for xx = o, 15, 4 do rect(x + xx, y + 1, 1, 1); rect(x + xx, y + 9, 1, 1) end
-  elseif p == "rock" then
-    for i = 1, 4 do
-      local hx, hy = floor(hash(c * 3 + i, r) * 12), floor(hash(r * 3 + i, c) * 12)
-      col(s, k * (0.75 + 0.4 * hash(c + i, r + i)))
-      rect(x + hx, y + hy, 3 + i % 3, 2 + i % 2)
-    end
-    if hash(c, r * 7) > 0.85 then lg.setColor(0.95, 0.75, 0.3, 0.8); rect(x + 6, y + 8, 2, 1) end   -- vena d'oro
-  else
-    col(s, k * 1.2)
-    rect(x, y, T, 1); rect(x, y, 1, T)
-    rect(x + 7, y + 7, 2, 2)
+  if p == "brick" then tex_brick(s, k, c, r)
+  elseif p == "panel" then tex_panel(s, k, c, r)
+  elseif p == "rock" then tex_rock(s, k, c, r)
+  elseif p == "roof" then tex_building(s, k, c, r, d >= 2)
+  else tex_panel(s, k, c, r) end
+
+  -- bordi: lato sinistro in luce, destro e sotto in ombra, contorno scuro sul vuoto
+  if lf then tone(s, 1.15); hp(0, 0, 2, 32); lg.setColor(0.04, 0.03, 0.05); hp(0, 0, 1, 32) end
+  if rt then tone(s, 0.5); hp(29, 0, 3, 32); lg.setColor(0.04, 0.03, 0.05); hp(31, 0, 1, 32) end
+  if dn then
+    tone(s, 0.45); hp(0, 28, 32, 4)
+    lg.setColor(0.04, 0.03, 0.05); hp(0, 31, 32, 1)
   end
-  -- macchioline
-  for i = 1, 3 do
-    if hash(c * 7 + i, r) > 0.55 then
-      col(s, k * 0.75)
-      rect(x + floor(hash(c, r + i) * 14) + 1, y + floor(hash(r, c + i) * 14) + 1, 1, 1)
-    end
-  end
-  -- bordi esposti
-  if lf then col(s, 0.62); rect(x, y, 1, T) end
-  if rt then col(s, 0.62); rect(x + T - 1, y, 1, T) end
-  if dn then col(s, 0.42); rect(x, y + T - 2, T, 2) end
   if up then
-    if th.deco == "factory" then
-      -- strisce di pericolo
-      for xx = 0, T - 1, 4 do
-        if ((c * 4 + xx) / 4) % 2 < 1 then col(th.top, 1) else lg.setColor(0.1, 0.1, 0.1) end
-        rect(x + xx, y, 4, 3)
+    local t = th.top
+    local d2 = th.deco
+    if d2 == "factory" then
+      -- bordo d'acciaio con strisce di pericolo inclinate
+      for yy = 0, 5 do
+        for xx = 0, 31 do
+          local on = floor(((c - 1) * 32 + xx + yy) / 5) % 2 == 0
+          if on then tone(t, 1) else lg.setColor(0.12, 0.12, 0.13) end
+          hp(xx, yy, 1, 1)
+        end
       end
+      lg.setColor(0.75, 0.78, 0.82); hp(0, 6, 32, 1)
+      lg.setColor(0.2, 0.22, 0.24); hp(0, 7, 32, 2)
+    elseif d2 == "arena" then
+      -- erba: striscia con luce, ciuffi sopra e frange che pendono
+      tone(t, 0.6); hp(0, 0, 32, 6)
+      tone(t, 1); hp(0, 0, 32, 4)
+      tone(t, 1.35); hp(0, 0, 32, 1)
+      for i = 0, 7 do
+        local gx = i * 4 + floor(hash(c * 8 + i, r) * 3)
+        local hh = 1 + floor(hash(c + i, r * 3) * 3)
+        tone(t, 1.2); hp(gx, -hh, 1, hh)
+        if hash(c * 2 + i, r) > 0.5 then tone(t, 0.75); hp(gx + 1, 6, 1, 1 + floor(hash(i, c) * 3)) end
+      end
+      lg.setColor(0, 0, 0, 0.25); hp(0, 6, 32, 2)
+    elseif d2 == "roofs" then
+      -- cornicione di pietra
+      tone(t, 1); hp(0, 0, 32, 6)
+      tone(t, 1.4); hp(0, 0, 32, 1)
+      tone(t, 0.6); hp(0, 5, 32, 1)
+      lg.setColor(0.04, 0.03, 0.05); hp(0, 6, 32, 1)
+      tone(t, 0.8); hp(floor(hash(c, r) * 24), 2, 4, 1)
+    elseif d2 == "mine" then
+      -- crosta di terra con sassolini
+      tone(t, 0.8); hp(0, 0, 32, 5)
+      tone(t, 1.1); hp(0, 0, 32, 2)
+      for i = 0, 3 do
+        local gx = floor(hash(c * 4 + i, r * 2) * 29)
+        tone(t, 1.35); hp(gx, 2, 3, 2)
+        tone(t, 0.6); hp(gx + 1, 3, 2, 1)
+      end
+      lg.setColor(0, 0, 0, 0.3); hp(0, 5, 32, 2)
     else
-      col(th.top, 1); rect(x, y, T, 3)
-      col(th.top, 1.35); rect(x, y, T, 1)
+      tone(t, 1); hp(0, 0, 32, 4)
+      tone(t, 1.4); hp(0, 0, 32, 1)
+      tone(t, 0.55); hp(0, 4, 32, 1)
     end
-    col(th.top, 0.55); rect(x, y + 3, T, 1)
   end
+  -- spigoli esterni arrotondati: si cancellano due pixel d'angolo
+  lg.setBlendMode("replace")
+  lg.setColor(0, 0, 0, 0)
+  if up and lf then hp(0, 0, 2, 1); hp(0, 1, 1, 1) end
+  if up and rt then hp(30, 0, 2, 1); hp(31, 1, 1, 1) end
+  if dn and lf then hp(0, 31, 2, 1); hp(0, 30, 1, 1) end
+  if dn and rt then hp(30, 31, 2, 1); hp(31, 30, 1, 1) end
+  lg.setBlendMode("alpha")
 
   -- decorazioni
   local d = th.deco
@@ -185,32 +314,53 @@ local function draw_solid(w, th, c, r, x, y, anims)
 end
 
 -- blocco distruttibile: cassa di legno (fabbrica, tetti) o roccia crepata (arena, miniera)
+-- blocco distruttibile: cassa di legno (fabbrica, tetti) o roccia crepata (arena, miniera)
 local function draw_breakable(w, th, c, r, x, y)
+  TX, TY = x, y
   local crate = th.deco == "factory" or th.deco == "roofs"
   if crate then
-    lg.setColor(0.10, 0.06, 0.03); rect(x, y, T, T)
-    lg.setColor(0.62, 0.42, 0.20); rect(x + 1, y + 1, T - 2, T - 2)
-    lg.setColor(0.45, 0.29, 0.13); rect(x + 1, y + 7, T - 2, 2); rect(x + 7, y + 1, 2, T - 2)
-    lg.setColor(0.78, 0.56, 0.30); rect(x + 1, y + 1, T - 2, 1)
-    lg.setColor(0.30, 0.18, 0.08); rect(x + 2, y + 2, 1, 1); rect(x + 13, y + 2, 1, 1)
-    rect(x + 2, y + 13, 1, 1); rect(x + 13, y + 13, 1, 1)
+    local wd = { 0.66, 0.45, 0.22 }
+    lg.setColor(0.08, 0.05, 0.03); hp(0, 0, 32, 32)
+    tone(wd, 1); hp(1, 1, 30, 30)
+    -- assi orizzontali
+    for yy = 1, 25, 8 do
+      tone(wd, 0.9 + 0.15 * hash(c, r * 4 + yy)); hp(4, yy + 3, 24, 6)
+      tone(wd, 0.7); hp(4, yy + 8, 24, 1)
+    end
+    -- telaio e croce
+    tone(wd, 0.62); hp(1, 1, 30, 3); hp(1, 28, 30, 3); hp(1, 1, 3, 30); hp(28, 1, 3, 30)
+    tone(wd, 1.25); hp(1, 1, 30, 1); hp(1, 1, 1, 30)
+    tone(wd, 0.55)
+    for i = 0, 23 do hp(4 + i, 4 + i, 2, 1) end
+    tone(wd, 1.15)
+    for i = 0, 23 do hp(4 + i, 3 + i, 1, 1) end
+    lg.setColor(0.8, 0.8, 0.85)
+    for _, q in ipairs({ { 2, 2 }, { 29, 2 }, { 2, 29 }, { 29, 29 } }) do hp(q[1], q[2], 1, 1) end
   else
-    col(th.stone, 0.95); rect(x, y, T, T)
-    col(th.stone, 1.2); rect(x + 1, y + 1, T - 2, 1)
-    -- crepe: si capisce che si puo' rompere
-    lg.setColor(0.08, 0.06, 0.05)
-    local o = floor(hash(c, r) * 6)
-    rect(x + 3 + o, y + 2, 1, 4); rect(x + 4 + o, y + 5, 1, 4); rect(x + 5 + o, y + 8, 3, 1)
-    rect(x + 8 + o % 3, y + 9, 1, 4); rect(x + 2, y + 11, 3, 1)
-    col(th.stone, 0.7); rect(x, y + T - 1, T, 1); rect(x + T - 1, y, 1, T)
+    tex_rock(th.stone, 1.05, c, r)
+    -- crepe marcate e bordo chiaro: si capisce che si rompe
+    lg.setColor(0.06, 0.04, 0.03)
+    local o = floor(hash(c, r) * 8)
+    hp(6 + o, 2, 2, 6); hp(8 + o, 7, 2, 6); hp(7 + o, 12, 4, 2); hp(10 + o, 13, 2, 7); hp(12 + o, 19, 5, 2)
+    hp(3, 20, 6, 2); hp(8, 21, 2, 5); hp(20, 6, 6, 2); hp(24, 7, 2, 5)
+    tone(th.stone, 1.5); hp(7 + o, 2, 1, 5); hp(9 + o, 7, 1, 5)
+    tone(th.stone, 1.3); hp(0, 0, 32, 1); hp(0, 0, 1, 32)
+    lg.setColor(0.04, 0.03, 0.05); hp(0, 31, 32, 1); hp(31, 0, 1, 32)
   end
 end
 
 local function draw_belt_base(x, y)
-  lg.setColor(0.10, 0.10, 0.12); rect(x, y, T, T)
-  lg.setColor(0.24, 0.25, 0.28); rect(x, y + 4, T, T - 4)
-  lg.setColor(0.36, 0.37, 0.40); rect(x, y + 4, T, 1)
-  lg.setColor(0.15, 0.15, 0.18); lg.circle("fill", x + 4, y + 10, 2.5); lg.circle("fill", x + 12, y + 10, 2.5)
+  TX, TY = x, y
+  lg.setColor(0.05, 0.05, 0.06); hp(0, 0, 32, 32)
+  lg.setColor(0.22, 0.23, 0.26); hp(0, 8, 32, 24)
+  lg.setColor(0.32, 0.33, 0.36); hp(0, 8, 32, 1)
+  for _, cx in ipairs({ 8, 24 }) do
+    lg.setColor(0.08, 0.08, 0.1); lg.circle("fill", x + cx * 0.5, y + 10, 3)
+    lg.setColor(0.45, 0.46, 0.5); lg.circle("fill", x + cx * 0.5, y + 10, 2.2)
+    lg.setColor(0.7, 0.72, 0.76); hp(cx - 2, 16, 2, 1)
+    lg.setColor(0.15, 0.15, 0.18); hp(cx - 1, 19, 2, 2)
+  end
+  lg.setColor(0.15, 0.15, 0.17); hp(0, 28, 32, 4)
 end
 
 -- cose appese sotto le piattaforme: stendardi (arena), lampade (fabbrica, miniera), lucine (tetti)
@@ -246,32 +396,63 @@ end
 
 local function draw_platform(w, th, c, r, x, y)
   local P = th.plat
-  col(P, 1); rect(x, y, T, 4)
-  col(P, 1.3); rect(x, y, T, 1)
-  col(P, 0.55); rect(x, y + 4, T, 1)
+  TX, TY = x, y
+  local left_end, right_end = w:tile(c - 1, r) ~= "=", w:tile(c + 1, r) ~= "="
   if th.deco == "factory" then
-    col(P, 0.6)
-    for xx = 2, T - 1, 3 do rect(x + xx, y + 1, 1, 3) end
+    -- grata d'acciaio: telaio, fori, rivetti
+    lg.setColor(0.04, 0.03, 0.05); hp(0, 0, 32, 10)
+    tone(P, 1); hp(0, 1, 32, 8)
+    tone(P, 1.35); hp(0, 1, 32, 1)
+    tone(P, 0.55); hp(0, 7, 32, 2)
+    lg.setColor(0.06, 0.06, 0.08)
+    for xx = 2, 30, 4 do hp(xx, 3, 2, 3) end
+    tone(P, 1.5)
+    for xx = 2, 30, 4 do hp(xx, 2, 2, 1) end
   else
-    col(P, 0.45); rect(x + 2, y + 2, 1, 1); rect(x + 13, y + 2, 1, 1)
-    if c % 2 == 0 then col(P, 0.8); rect(x + 7, y + 1, 1, 3) end
+    -- tavola di legno: venature, giunture con chiodi
+    lg.setColor(0.04, 0.03, 0.05); hp(0, 0, 32, 10)
+    tone(P, 1); hp(0, 1, 32, 8)
+    tone(P, 1.3); hp(0, 1, 32, 1)
+    tone(P, 0.6); hp(0, 7, 32, 2)
+    tone(P, 0.8)
+    for i = 0, 2 do
+      local gx = floor(hash(c * 3 + i, r) * 24)
+      hp(gx, 3 + (i % 2) * 2, 6 + floor(hash(i, c) * 6), 1)
+    end
+    if c % 2 == 0 and not left_end then
+      lg.setColor(0.04, 0.03, 0.05); hp(0, 1, 1, 7)
+      lg.setColor(0.75, 0.75, 0.8); hp(2, 3, 1, 1); hp(2, 6, 1, 1)
+    end
   end
+  if left_end then lg.setColor(0.04, 0.03, 0.05); hp(0, 0, 1, 10) end
+  if right_end then lg.setColor(0.04, 0.03, 0.05); hp(31, 0, 1, 10) end
   -- staffe agli estremi
-  col(P, 0.5)
-  if w:tile(c - 1, r) ~= "=" then rect(x + 1, y + 5, 2, 4); rect(x + 3, y + 5, 2, 2) end
-  if w:tile(c + 1, r) ~= "=" then rect(x + T - 3, y + 5, 2, 4); rect(x + T - 5, y + 5, 2, 2) end
+  local function bracket(x0, dir)
+    lg.setColor(0.04, 0.03, 0.05)
+    lg.polygon("fill", x + x0 * 0.5, y + 4.5, x + (x0 + dir * 9) * 0.5, y + 4.5, x + x0 * 0.5, y + 13)
+    tone(P, 0.55)
+    lg.polygon("fill", x + (x0 + dir) * 0.5, y + 5, x + (x0 + dir * 7) * 0.5, y + 5, x + (x0 + dir) * 0.5, y + 11.5)
+  end
+  if left_end then bracket(2, 1) end
+  if right_end then bracket(30, -1) end
 end
 
 local function draw_spikes(th, x, y)
-  lg.setColor(0.18, 0.16, 0.18); rect(x, y + T - 3, T, 3)
-  for i = 0, 2 do
-    local bx = x + i * 5 + 1
-    col(th.spike, 0.7)
-    lg.polygon("fill", bx, y + T - 3, bx + 2.5, y + 4, bx + 5, y + T - 3)
-    col(th.spike, 1.15)
-    lg.polygon("fill", bx, y + T - 3, bx + 2.5, y + 4, bx + 2.5, y + T - 3)
-    lg.setColor(0.9, 0.2, 0.2)
-    rect(bx + 2, y + 4, 1, 3)
+  TX, TY = x, y
+  lg.setColor(0.04, 0.03, 0.05); hp(0, 25, 32, 7)
+  lg.setColor(0.25, 0.22, 0.25); hp(0, 26, 32, 5)
+  lg.setColor(0.4, 0.36, 0.4); hp(0, 26, 32, 1)
+  for i = 0, 3 do
+    local bx = x + i * 4
+    local by = y + 13
+    lg.setColor(0.04, 0.03, 0.05)
+    lg.polygon("fill", bx - 0.5, by, bx + 2, y + 3.5, bx + 4.5, by)
+    tone(th.spike, 0.75)
+    lg.polygon("fill", bx, by, bx + 2, y + 4.5, bx + 4, by)
+    tone(th.spike, 1.3)
+    lg.polygon("fill", bx + 0.5, by, bx + 2, y + 4.5, bx + 2, by)
+    lg.setColor(0.85, 0.15, 0.15)
+    lg.polygon("fill", bx + 1.4, y + 7, bx + 2, y + 4.5, bx + 2.6, y + 7)
   end
 end
 

@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.10)
+# Friendslop Fight (prototipo v0.11)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
