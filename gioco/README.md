@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.8)
+# Friendslop Fight (prototipo v0.9)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -18,8 +18,23 @@ All'avvio: Gioca, Personaggi, Obiettivi, Esci. Frecce/WASD o croce/levetta per m
 - **Monete**: a fine partita, solo per i giocatori umani (partita giocata, eliminazioni, round e partite vinte).
 Il profilo si salva nella cartella dati di LÖVE (`profilo.lua`).
 
+## Mappe
+Quattro mappe, generate da `tools/genera_mappe.py` (64 x 36 tile). Elementi interattivi:
+- **Molle**: lanciano in alto e restituiscono il doppio salto.
+- **Nastri trasportatori**: trascinano giocatori e armi a terra.
+- **Blocchi distruttibili**: le esplosioni, le presse e i massi li rompono e la mappa cambia durante il round.
+- **Portali** (a coppie, azzurri e arancioni): si esce dall'altro con la stessa velocità; ci passano anche i proiettili.
+- **Piattaforme mobili e ascensori**: attraversabili dal basso, trasportano chi ci sta sopra.
+
+| Mappa | Com'è fatta | Eventi |
+|---|---|---|
+| Arena | Colosseo: ponte di blocchi sopra la fossa di spuntoni, molle verso le tribune, piattaforma mobile, portali negli angoli | Frana di massi, geyser di fuoco |
+| Fabbrica | Nastri che portano verso le vasche di spuntoni, ascensori ai lati, torre su una pila di casse | Barili esplosivi, presse idrauliche |
+| Tetti | Palazzi sul vuoto, gondola e montacarichi, molle sui tetti, serbatoio distruttibile | Fulmini, raffiche di vento verso il vuoto |
+| Miniera | Ascensori nei pozzi, tunnel di roccia da far saltare, pareti distruttibili, portali incrociati | Frana di massi, barili |
+
 ## Eventi di mappa
-Ogni 12-18 secondi la mappa colpisce: frana di massi nell'Arena, barili esplosivi in Fabbrica, fulmini sui Tetti. Ogni colpo è annunciato da una colonna tratteggiata e da un bersaglio a terra.
+Ogni evento è annunciato (scritta, colonna tratteggiata, bersaglio a terra; frecce per il vento). L'intensità cresce col round: si parte con un evento ogni 10-14 secondi e dopo 40 secondi se ne ha uno ogni 5-7, con più colpi per volta e a volte due eventi insieme (ondata).
 
 ## Lobby
 Ogni giocatore sceglie l'eroe con sinistra/destra e la skin con su/giu (tastiera 1: A D W S, tastiera 2: frecce). I bot prendono un eroe a caso. Tab (o Select sul controller) cambia il livello dei bot: Facile, Normale, Difficile. Esc torna al menu.

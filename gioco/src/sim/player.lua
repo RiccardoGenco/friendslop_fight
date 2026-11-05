@@ -1,6 +1,7 @@
 -- Stato e aggiornamento di un giocatore. Nessuna dipendenza da LÖVE.
 -- Il combattimento vero e proprio (colpi, parry, clash) sta in combat.lua.
 local data = require("src.sim.data")
+local Movers = require("src.sim.movers")
 local Combat = require("src.sim.combat")
 
 local Player = {}
@@ -400,7 +401,7 @@ function Player.update(p, inp, game)
 
     -- salto e discesa dalle piattaforme
     if p.buf.jump > 0 then
-      if (inp.my or 0) > 0.6 and p.grounded and world:standing_on_oneway(p) then
+      if (inp.my or 0) > 0.6 and p.grounded and (world:standing_on_oneway(p) or p.on_mover) then
         p.drop_timer = P.drop_frames
         p.buf.jump = 0
       elseif p.coyote > 0 and not (p.action and p.action.type == "dash") then
@@ -458,7 +459,14 @@ function Player.update(p, inp, game)
   -- movimento e collisioni
   local hit_wall = world:move_x(p, p.vx * dt)
   if hit_wall then p.vx = (stunned and -p.vx * 0.3) or 0 end
+  local prev_y = p.y
   local landed, bumped = world:move_y(p, p.vy * dt, p.drop_timer > 0)
+  if landed then
+    p.on_mover = nil
+  elseif game.movers and #game.movers > 0 then
+    landed = Movers.collide(game, p, prev_y, p.drop_timer > 0)
+  end
+  if not landed then p.on_mover = nil end
   if landed then
     p.vy = 0
     p.grounded = true

@@ -5,14 +5,15 @@
 local Audio = require("src.audio")
 
 local Fx = { particles = {}, ghosts = {}, rings = {}, shake = 0,
-             freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {}, bolts = {}, banner = nil }
+             freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {}, bolts = {}, banner = nil,
+             columns = {} }
 
 local function rnd(a, b) return a + love.math.random() * (b - a) end
 
 function Fx.reset()
   Fx.particles, Fx.ghosts, Fx.rings, Fx.shake = {}, {}, {}, 0
   Fx.freeze, Fx.kx, Fx.ky, Fx.flash, Fx.flashes, Fx.pl = 0, 0, 0, 0, {}, {}
-  Fx.bolts, Fx.banner = {}, nil
+  Fx.bolts, Fx.banner, Fx.columns = {}, nil, {}
 end
 
 function Fx.add_shake(v)
@@ -295,8 +296,12 @@ function Fx.handle(e, game)
     Fx.burst(e.x, e.y, { 1, 1, 0.7 }, 8, 80, 0.3, 0)
     Audio.play("spawn")
   elseif t == "map_event" then
-    local names = { rocks = "FRANA!", barrels = "BARILI IN ARRIVO!", lightning = "TEMPESTA!" }
-    Fx.banner = { text = names[e.kind] or "ATTENZIONE!", t = 1.6 }
+    local names = { rocks = "FRANA!", barrels = "BARILI IN ARRIVO!", lightning = "TEMPESTA!",
+                    press = "PRESSE!", geyser = "GEYSER DI FUOCO!",
+                    wind = (e.dir or 1) > 0 and "VENTO  >>>" or "<<<  VENTO" }
+    local text = names[e.kind] or "ATTENZIONE!"
+    if Fx.banner and Fx.banner.t > 1.55 then text = "ONDATA!  " .. Fx.banner.text .. " + " .. text end
+    Fx.banner = { text = text, t = 1.6 }
     Audio.play("telegraph", 0.6)
     Audio.play("telegraph", 0.45, 0.6)
   elseif t == "lightning" then
@@ -307,6 +312,32 @@ function Fx.handle(e, game)
     Fx.hitstop(3)
     Audio.play("explosion", 1.6)
     Audio.play("sniper", 1.8, 0.7)
+  elseif t == "press" then
+    Fx.columns[#Fx.columns + 1] = { kind = "press", x = e.x, y1 = e.y1 or 0, y2 = e.y, w = e.width or 40, life = 0.6, max = 0.6 }
+    Fx.burst(e.x - (e.width or 40) / 2, e.y, { 0.8, 0.8, 0.75 }, 10, 160, 0.4, 300, 2)
+    Fx.burst(e.x + (e.width or 40) / 2, e.y, { 0.8, 0.8, 0.75 }, 10, 160, 0.4, 300, 2)
+    Fx.add_shake(8); Fx.hitstop(4)
+    Audio.play("break_", 0.4); Audio.play("explosion", 0.7, 0.6)
+  elseif t == "geyser" then
+    Fx.columns[#Fx.columns + 1] = { kind = "geyser", x = e.x, y1 = e.y1 or 0, y2 = e.y, w = e.width or 14, life = 0.8, max = 0.8 }
+    Fx.burst(e.x, e.y, { 1, 0.6, 0.15 }, 20, 220, 0.5, -200, 2)
+    Fx.add_shake(4)
+    Audio.play("explosion", 1.3, 0.7); Audio.play("shoot", 0.3, 0.6)
+  elseif t == "wind_start" then
+    Audio.play("dash", 0.4); Audio.play("telegraph", 0.35, 0.5)
+  elseif t == "spring" then
+    Fx.burst(e.x, e.y - 4, { 1, 0.8, 0.6 }, 6, 90, 0.25, 0, 1)
+    Audio.play("jump", 1.8); Audio.play("ricochet", 0.6, 0.4)
+  elseif t == "portal" then
+    local c = { 0.5, 0.85, 1 }
+    Fx.burst(e.x, e.y, c, e.small and 4 or 12, 110, 0.3, 0, 1)
+    Fx.burst(e.tx, e.ty, c, e.small and 4 or 12, 110, 0.3, 0, 1)
+    if not e.small then Audio.play("pickup", 0.6, 0.6); Audio.play("telegraph", 1.8, 0.4) end
+  elseif t == "blocks_broken" then
+    for _, b in ipairs(e.list or {}) do
+      Fx.burst(b.x, b.y, { 0.55, 0.42, 0.3 }, 6, 150, 0.6, 500, 2)
+    end
+    Audio.play("break_", 0.8)
   elseif t == "rock" then
     Fx.burst(e.x, e.y, { 0.55, 0.5, 0.45 }, 14, 150, 0.5, 400, 2)
     Fx.burst(e.x, e.y, { 0.7, 0.68, 0.65 }, 8, 60, 0.7, -30, 3)
@@ -340,7 +371,7 @@ function Fx.update(dt)
     Fx.banner.t = Fx.banner.t - dt
     if Fx.banner.t <= 0 then Fx.banner = nil end
   end
-  for _, list in ipairs({ Fx.flashes, Fx.ghosts, Fx.bolts }) do
+  for _, list in ipairs({ Fx.flashes, Fx.ghosts, Fx.bolts, Fx.columns }) do
     for i = #list, 1, -1 do
       local f = list[i]
       f.life = f.life - dt
@@ -381,6 +412,32 @@ function Fx.draw()
     local a = math.min(1, p.life / (p.max * 0.5))
     love.graphics.setColor(p.color[1], p.color[2], p.color[3], a)
     love.graphics.rectangle("fill", math.floor(p.x), math.floor(p.y), p.size, p.size)
+  end
+  -- presse e geyser
+  for _, c in ipairs(Fx.columns) do
+    local k = 1 - c.life / c.max
+    local x1 = c.x - c.w / 2
+    if c.kind == "press" then
+      -- il pistone scende di colpo e risale piano
+      local down = k < 0.15 and k / 0.15 or 1 - (k - 0.15) / 0.85
+      local bottom = c.y1 + (c.y2 - c.y1) * down
+      love.graphics.setColor(0.25, 0.26, 0.28); love.graphics.rectangle("fill", c.x - 4, c.y1, 8, bottom - c.y1)
+      love.graphics.setColor(0.08, 0.08, 0.09); love.graphics.rectangle("fill", x1 - 1, bottom - 13, c.w + 2, 14)
+      love.graphics.setColor(0.55, 0.57, 0.6); love.graphics.rectangle("fill", x1, bottom - 12, c.w, 12)
+      love.graphics.setColor(0.95, 0.75, 0.15)
+      for xx = 0, c.w - 6, 8 do love.graphics.rectangle("fill", x1 + xx, bottom - 4, 4, 3) end
+    else
+      local h = (c.y2 - c.y1) * math.min(1, k * 4)
+      love.graphics.setBlendMode("add")
+      for j = 0, 3 do
+        love.graphics.setColor(1, 0.5 - j * 0.1, 0.1, (0.5 - j * 0.1) * (1 - k))
+        local ww = c.w * (1 - j * 0.2) + math.sin((k * 30) + j) * 2
+        love.graphics.rectangle("fill", c.x - ww / 2, c.y2 - h, ww, h)
+      end
+      love.graphics.setColor(1, 0.95, 0.6, 0.8 * (1 - k))
+      love.graphics.rectangle("fill", c.x - 2, c.y2 - h, 4, h)
+      love.graphics.setBlendMode("alpha")
+    end
   end
   -- fulmini: linea spezzata che cambia forma a ogni frame
   for _, b in ipairs(Fx.bolts) do

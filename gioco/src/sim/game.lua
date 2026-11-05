@@ -11,11 +11,13 @@ local World = require("src.sim.world")
 local Player = require("src.sim.player")
 local Combat = require("src.sim.combat")
 local MapEvents = require("src.sim.mapevents")
+local Movers = require("src.sim.movers")
+local Gadgets = require("src.sim.gadgets")
 
 local Game = {}
 Game.__index = Game
 
-local MAP_NAMES = { "arena", "fabbrica", "tetti" }
+local MAP_NAMES = { "arena", "fabbrica", "tetti", "miniera" }
 local EMPTY = {}
 local min, max = math.min, math.max
 
@@ -109,6 +111,7 @@ function Game:start_round(forced_map)
   self.crate_timer = self.rng:int(R.crate_min, R.crate_max)
   self.winners = {}
   MapEvents.reset(self)
+  Movers.reset(self)
   self:emit("round_setup", 0, 0, { round = self.round, map = world.name })
 end
 
@@ -324,7 +327,8 @@ function Game:update_hazards()
   for _, p in ipairs(self.players) do
     if p.alive then
       local x1, y1, x2, y2 = Player.box(p)
-      if p.spike_cd == 0 and p.invuln == 0 and world:rect_touches(x1, y2 - 8, x2, y2, "^") then
+      -- margine di 3 px: chi sta sul bordo accanto agli spuntoni non si punge
+      if p.spike_cd == 0 and p.invuln == 0 and world:rect_touches(x1 + 3, y2 - 8, x2 - 3, y2, "^") then
         p.spike_cd = P.spike_cooldown
         Combat.hazard_hit(self, p, P.spike_damage, "spikes")
       end
@@ -365,6 +369,7 @@ function Game:update(inputs)
   inputs = inputs or EMPTY
   self.frame = self.frame + 1
   local ph = self.phase
+  Movers.update(self)
   if ph == "countdown" then
     self:step_players(inputs, true)
     self:update_void()
@@ -377,6 +382,7 @@ function Game:update(inputs)
   elseif ph == "playing" then
     self.round_frame = self.round_frame + 1
     self:step_players(inputs, false)
+    Gadgets.update(self)
     Combat.update_projectiles(self)
     Combat.update_fields(self)
     self:update_items()
@@ -388,6 +394,7 @@ function Game:update(inputs)
     self:check_round_end()
   elseif ph == "roundend" then
     self:step_players(inputs, true)
+    Gadgets.update(self)
     Combat.update_projectiles(self)
     Combat.update_fields(self)
     self:update_items()

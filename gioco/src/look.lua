@@ -43,6 +43,13 @@ local THEMES = {
     plat = { 0.52, 0.37, 0.24 }, spike = { 0.66, 0.66, 0.72 }, deco = "roofs", ambient = "rain",
   },
 }
+THEMES.Miniera = {
+  sky = { { 0.03, 0.02, 0.02 }, { 0.12, 0.07, 0.05 } },
+  far = "cave", farc = { 0.10, 0.06, 0.05 }, nearc = { 0.06, 0.035, 0.03 },
+  stone = { 0.42, 0.30, 0.22 }, top = { 0.50, 0.38, 0.26 }, pattern = "rock",
+  plat = { 0.62, 0.42, 0.22 }, spike = { 0.55, 0.45, 0.38 }, deco = "mine", ambient = "dust",
+}
+
 local DEFAULT = {
   sky = { { 0.05, 0.06, 0.11 }, { 0.13, 0.15, 0.24 } }, stars = true,
   far = "grid", farc = { 0.12, 0.14, 0.22 }, nearc = { 0.08, 0.09, 0.15 },
@@ -82,6 +89,13 @@ local function draw_solid(w, th, c, r, x, y, anims)
     col(s, k * 1.12)
     local o = (r % 2) * 2
     for xx = o, 15, 4 do rect(x + xx, y + 1, 1, 1); rect(x + xx, y + 9, 1, 1) end
+  elseif p == "rock" then
+    for i = 1, 4 do
+      local hx, hy = floor(hash(c * 3 + i, r) * 12), floor(hash(r * 3 + i, c) * 12)
+      col(s, k * (0.75 + 0.4 * hash(c + i, r + i)))
+      rect(x + hx, y + hy, 3 + i % 3, 2 + i % 2)
+    end
+    if hash(c, r * 7) > 0.85 then lg.setColor(0.95, 0.75, 0.3, 0.8); rect(x + 6, y + 8, 2, 1) end   -- vena d'oro
   else
     col(s, k * 1.2)
     rect(x, y, T, 1); rect(x, y, 1, T)
@@ -146,6 +160,17 @@ local function draw_solid(w, th, c, r, x, y, anims)
       lg.setColor(0.25, 0.30, 0.28)
       rect(lf and x - 2 or x + T, y, 2, T)
     end
+  elseif d == "mine" then
+    if dn and hv < 0.22 then
+      -- trave di sostegno sotto il soffitto
+      lg.setColor(0.45, 0.30, 0.16); rect(x, y + T, T, 3)
+      lg.setColor(0.30, 0.20, 0.10); rect(x, y + T + 3, T, 1)
+    elseif dn and hv > 0.9 then
+      anims[#anims + 1] = { kind = "lamp", x = x + T / 2, y = y + T, seed = hv }
+    end
+    if (lf or rt) and not up and hv > 0.9 then
+      anims[#anims + 1] = { kind = "torch", x = lf and x - 3 or x + T + 2, y = y + 6, seed = hv }
+    end
   elseif d == "roofs" then
     if up and open(0, -2) and open(0, -3) and hv < 0.07 then
       local h = 10 + floor(hash(c, r) * 10)
@@ -157,6 +182,35 @@ local function draw_solid(w, th, c, r, x, y, anims)
       lg.setColor(0.12, 0.10, 0.12); rect(x + 3, y - 10, 9, 2)
     end
   end
+end
+
+-- blocco distruttibile: cassa di legno (fabbrica, tetti) o roccia crepata (arena, miniera)
+local function draw_breakable(w, th, c, r, x, y)
+  local crate = th.deco == "factory" or th.deco == "roofs"
+  if crate then
+    lg.setColor(0.10, 0.06, 0.03); rect(x, y, T, T)
+    lg.setColor(0.62, 0.42, 0.20); rect(x + 1, y + 1, T - 2, T - 2)
+    lg.setColor(0.45, 0.29, 0.13); rect(x + 1, y + 7, T - 2, 2); rect(x + 7, y + 1, 2, T - 2)
+    lg.setColor(0.78, 0.56, 0.30); rect(x + 1, y + 1, T - 2, 1)
+    lg.setColor(0.30, 0.18, 0.08); rect(x + 2, y + 2, 1, 1); rect(x + 13, y + 2, 1, 1)
+    rect(x + 2, y + 13, 1, 1); rect(x + 13, y + 13, 1, 1)
+  else
+    col(th.stone, 0.95); rect(x, y, T, T)
+    col(th.stone, 1.2); rect(x + 1, y + 1, T - 2, 1)
+    -- crepe: si capisce che si puo' rompere
+    lg.setColor(0.08, 0.06, 0.05)
+    local o = floor(hash(c, r) * 6)
+    rect(x + 3 + o, y + 2, 1, 4); rect(x + 4 + o, y + 5, 1, 4); rect(x + 5 + o, y + 8, 3, 1)
+    rect(x + 8 + o % 3, y + 9, 1, 4); rect(x + 2, y + 11, 3, 1)
+    col(th.stone, 0.7); rect(x, y + T - 1, T, 1); rect(x + T - 1, y, 1, T)
+  end
+end
+
+local function draw_belt_base(x, y)
+  lg.setColor(0.10, 0.10, 0.12); rect(x, y, T, T)
+  lg.setColor(0.24, 0.25, 0.28); rect(x, y + 4, T, T - 4)
+  lg.setColor(0.36, 0.37, 0.40); rect(x, y + 4, T, 1)
+  lg.setColor(0.15, 0.15, 0.18); lg.circle("fill", x + 4, y + 10, 2.5); lg.circle("fill", x + 12, y + 10, 2.5)
 end
 
 local function draw_platform(w, th, c, r, x, y)
@@ -262,6 +316,18 @@ local function far_layer(w, th, kind, color, near)
       end
       x = x + bw + 4 + hash(i, 3) * 14
     end
+  elseif kind == "cave" then
+    -- pareti di roccia con stalattiti e stalagmiti, qualche cristallo
+    for xx = 0, W, 4 do
+      local top = 30 + sin(xx * 0.03 + seed) * 18 + sin(xx * 0.11) * 8 + (hash(xx, 3) > 0.92 and 30 or 0)
+      local bot = 40 + sin(xx * 0.02 + seed * 2) * 20 + (hash(xx, 5) > 0.93 and 26 or 0)
+      col(color); rect(xx, 0, 4, top); rect(xx, H - bot, 4, bot)
+    end
+    for k = 1, 30 do
+      local cx, cy = hash(k, seed + 1) * W, H * (0.2 + 0.6 * hash(k, seed + 2))
+      lg.setColor(0.5, 0.8, 1, near and 0.25 or 0.12)
+      lg.polygon("fill", cx, cy - 4, cx + 2, cy, cx, cy + 4, cx - 2, cy)
+    end
   else
     col(color, 1, 0.5)
     for xx = 0, W, 48 do rect(xx, 0, 1, H) end
@@ -275,15 +341,18 @@ local cache = {}
 
 local function prepare(w)
   local cv = cache[w]
-  if cv then return cv end
+  if cv and cv.version == w.version then return cv end
   local th = Look.theme(w)
-  cv = { anims = {} }
   lg.push("all")
   lg.origin()
   lg.setLineWidth(1)
-  cv.far = far_layer(w, th, th.far, th.farc, false)
-  cv.near = far_layer(w, th, th.far, th.nearc, true)
-  cv.map = lg.newCanvas(w.width, w.height)
+  if not cv then
+    cv = {}
+    cv.far = far_layer(w, th, th.far, th.farc, false)
+    cv.near = far_layer(w, th, th.far, th.nearc, true)
+    cv.map = lg.newCanvas(w.width, w.height)
+  end
+  cv.anims, cv.version = {}, w.version
   lg.setCanvas(cv.map)
   lg.clear(0, 0, 0, 0)
   for r = 1, w.rows_n do
@@ -294,7 +363,9 @@ local function prepare(w)
   for r = 1, w.rows_n do
     for c = 1, w.cols do
       local t, x, y = w.grid[r][c], (c - 1) * T, (r - 1) * T
-      if t == "#" then draw_solid(w, th, c, r, x, y, cv.anims)
+      if t == "#" and w.breakable[r] and w.breakable[r][c] then draw_breakable(w, th, c, r, x, y)
+      elseif t == "#" and w.belts[r] and w.belts[r][c] then draw_belt_base(x, y)
+      elseif t == "#" then draw_solid(w, th, c, r, x, y, cv.anims)
       elseif t == "=" then draw_platform(w, th, c, r, x, y)
       elseif t == "^" then draw_spikes(th, x, y) end
     end
@@ -375,6 +446,89 @@ function Look.map(w, time)
         lg.setBlendMode("alpha")
         lg.setColor(1, 0.3, 0.3); rect(a.x - 1, a.y - 1, 2, 2)
       end
+    end
+  end
+end
+
+-- elementi interattivi, disegnati ogni frame (si muovono o sono animati)
+function Look.gadgets(game, time)
+  local w = game.world
+  local th = Look.theme(w)
+  -- frecce dei nastri che scorrono
+  for r = 1, w.rows_n do
+    for c, d in pairs(w.belts[r]) do
+      local x, y = (c - 1) * T, (r - 1) * T
+      local off = (time * 60 * d) % 8
+      lg.setColor(0.50, 0.50, 0.55); rect(x, y, T, 3)
+      lg.setColor(1, 0.75, 0.15)
+      for k = -1, 2 do
+        local ax = x + k * 8 + off
+        if ax >= x - 1 and ax <= x + T - 4 then
+          if d > 0 then lg.polygon("fill", ax, y, ax + 4, y + 1.5, ax, y + 3)
+          else lg.polygon("fill", ax + 4, y, ax, y + 1.5, ax + 4, y + 3) end
+        end
+      end
+    end
+  end
+  -- molle: base, spirale che si comprime quando qualcuno ci sta vicino, piatto
+  for _, s in ipairs(w.springs) do
+    local press = 0
+    for _, p in ipairs(game.players) do
+      if p.alive and abs(p.x - s.x) < 10 and abs(p.y - s.y) < 6 then press = 3 end
+    end
+    local boing = Look.spring_t and Look.spring_t[s] or 0
+    local top = s.y - 9 + press - boing * 4
+    lg.setColor(0.08, 0.08, 0.1); rect(s.x - 7, s.y - 3, 14, 3)
+    lg.setColor(0.35, 0.36, 0.4); rect(s.x - 6, s.y - 3, 12, 2)
+    lg.setColor(0.75, 0.78, 0.82)
+    local n = 3
+    for i = 0, n - 1 do
+      local yy = s.y - 3 - (s.y - 3 - top) * (i + 0.5) / n
+      rect(s.x - 4 + (i % 2) * 2, yy, 6, 1)
+    end
+    lg.setColor(0.08, 0.08, 0.1); rect(s.x - 7, top - 2, 14, 3)
+    lg.setColor(1, 0.35, 0.3); rect(s.x - 6, top - 2, 12, 2)
+    lg.setColor(1, 0.7, 0.65); rect(s.x - 6, top - 2, 12, 1)
+  end
+  -- portali: ovale che pulsa, nel colore della coppia
+  for _, pt in ipairs(w.portals) do
+    local c = pt.pair == "P" and { 0.35, 0.8, 1 } or { 1, 0.55, 0.25 }
+    local cx, cy = pt.x, pt.y - T
+    lg.setBlendMode("add")
+    lg.setColor(c[1], c[2], c[3], 0.12 + 0.05 * sin(time * 4))
+    lg.ellipse("fill", cx, cy, 11, 20)
+    lg.setBlendMode("alpha")
+    lg.setColor(0.03, 0.02, 0.06, 0.9); lg.ellipse("fill", cx, cy, 6, 14)
+    lg.setLineWidth(2)
+    lg.setColor(c[1], c[2], c[3])
+    lg.ellipse("line", cx, cy, 7 + sin(time * 5) * 0.6, 15)
+    lg.setLineWidth(1)
+    for k = 1, 6 do
+      local a = time * 2.5 + k * 1.05
+      lg.setColor(c[1], c[2], c[3], 0.8)
+      rect(cx + cos(a) * 6, cy + sin(a) * 13, 1, 1)
+    end
+  end
+  -- piattaforme mobili
+  for _, m in ipairs(game.movers or {}) do
+    local x, y = floor(m.x), floor(m.y)
+    local P = th.plat
+    -- cavi o binari verso il punto di partenza, per far capire il percorso
+    lg.setColor(0.3, 0.3, 0.35, 0.5)
+    if m.ddy ~= 0 then
+      rect(x + 2, min(m.y0, m.y0 + m.ddy), 1, abs(m.ddy) + 4); rect(x + m.w - 3, min(m.y0, m.y0 + m.ddy), 1, abs(m.ddy) + 4)
+    else
+      rect(min(m.x0, m.x0 + m.ddx), m.y0 + 8, abs(m.ddx) + m.w, 1)
+    end
+    lg.setColor(0.06, 0.06, 0.08); rect(x - 1, y - 1, m.w + 2, 8)
+    col(P, 1); rect(x, y, m.w, 5)
+    col(P, 1.3); rect(x, y, m.w, 1)
+    lg.setColor(1, 0.75, 0.15)
+    for xx = 2, m.w - 4, 6 do rect(x + xx, y + 5, 3, 2) end
+    -- spia che lampeggia nel verso del movimento
+    if floor(time * 4) % 2 == 0 then
+      lg.setColor(0.4, 1, 0.5)
+      rect(x + (m.vx >= 0 and m.w - 3 or 1), y + 2, 2, 2)
     end
   end
 end

@@ -55,14 +55,24 @@ M.player = {
   throw_speed = 340, throw_damage = 20, throw_gravity = 600,
 }
 
+-- Elementi delle mappe (src/sim/gadgets.lua, src/sim/movers.lua)
+M.gadgets = { spring_vel = 560, belt_speed = 75, portal_cd = 40 }
+
 -- Eventi di mappa (src/sim/mapevents.lua). Tempi in frame (60 = 1 secondo).
 M.map_events = {
-  first_min = 600, first_max = 900, every_min = 720, every_max = 1080,
-  warn = 80,                                             -- preavviso prima del colpo
-  rocks = { count = 3, dmg = 25, size = 12, gravity = 900, max_speed = 520 },
-  barrels = { count = 2, size = 12, gravity = 800, max_speed = 480,
+  first_min = 360, first_max = 540,                      -- primo evento dopo 6-9 s
+  every_min = 600, every_max = 840,                      -- poi ogni 10-14 s a inizio round...
+  late_min = 300, late_max = 420,                        -- ...che scendono a 5-7 s a fine rampa
+  ramp = 2400,                                           -- intensita' piena dopo 40 s
+  wave_chance = 0.6,                                     -- probabilita' di ondata doppia a intensita' piena
+  warn = 75,                                             -- preavviso prima del colpo
+  rocks = { count = 3, extra = 4, stagger = 8, dmg = 25, size = 12, gravity = 900, max_speed = 520 },
+  barrels = { count = 2, extra = 3, stagger = 14, size = 12, gravity = 800, max_speed = 480,
               blast = { radius = 46, dmg = 45, kb = 330, self_mul = 1 } },
-  lightning = { count = 2, dmg = 40, width = 16 },
+  lightning = { count = 2, extra = 3, stagger = 10, dmg = 40, width = 16 },
+  press = { count = 1, extra = 2, stagger = 30, dmg = 55, width = 44, push = 260, breaks = true },
+  geyser = { count = 2, extra = 3, stagger = 12, dmg = 15, width = 14, height = 150, burn = true, push = 380 },
+  wind = { frames = 180, frames_extra = 120, speed = 60, speed_extra = 40, air_mul = 1.25 },
 }
 
 M.momentum = {

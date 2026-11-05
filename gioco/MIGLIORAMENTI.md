@@ -26,3 +26,16 @@ passa anche per menu, impostazioni e pausa, e partite tra bot ai tre livelli.
 
 Da verificare a mano (non provabile senza schermo): leggibilita' di HUD e fendenti alla distanza della
 telecamera, volume relativo di musica ed effetti, intensita' della vibrazione.
+
+# v0.9: mappe ed eventi
+
+| Caratteristica | Prima | Dopo |
+|---|---|---|
+| Struttura delle mappe | Solo blocchi, piattaforme e spuntoni | Molle, nastri, blocchi distruttibili, portali (anche per i proiettili), piattaforme mobili e ascensori |
+| Numero di mappe | 3 | 4 (nuova: Miniera) |
+| Eventi | Un tipo per mappa, ritmo fisso | Due tipi per mappa (nuovi: geyser, presse, vento), intensità crescente, ondate doppie |
+| Bot | Cadevano spesso nel vuoto | Valutano i burroni prima di saltare, usano il doppio salto se cadono, schivano colonne più larghe |
+| Spuntoni | Pungevano anche stando sul bordo accanto | Margine di 3 px: pungono solo se ci entri |
+
+Misure con partite tra bot (4 giocatori, 6 partite per mappa): morti nel vuoto sui Tetti da 75 a 13,
+morti sugli spuntoni in Miniera da 28 a 9; il combattimento resta la prima causa di morte su ogni mappa.

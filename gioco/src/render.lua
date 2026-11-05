@@ -585,8 +585,10 @@ local function draw_hazards(game, time)
       local k = 1 - min(1, h.t / data.map_events.warn)
       local fast = h.t < 25
       local on = floor(time * (fast and 16 or 6)) % 2 == 0
-      local c = h.kind == "lightning" and { 0.6, 0.85, 1 } or (h.kind == "barrels" and { 1, 0.4, 0.2 } or { 1, 0.75, 0.3 })
-      local hw = h.kind == "lightning" and data.map_events.lightning.width / 2 or 7
+      local COLS = { lightning = { 0.6, 0.85, 1 }, barrels = { 1, 0.4, 0.2 }, rocks = { 1, 0.75, 0.3 },
+                     press = { 1, 0.9, 0.2 }, geyser = { 1, 0.45, 0.1 } }
+      local c = COLS[h.kind] or { 1, 0.75, 0.3 }
+      local hw = (h.width or 14) / 2
       lg.setBlendMode("add")
       lg.setColor(c[1], c[2], c[3], 0.06 + 0.16 * k)
       lg.rectangle("fill", x - hw, h.y0, hw * 2, (h.y2 or h.y0 + 200) - h.y0)
@@ -631,6 +633,32 @@ local function draw_hazards(game, time)
       lg.rectangle("fill", x - 1, h.y - 2, 2, 3)
       if floor(time * 10) % 2 == 0 then lg.setColor(1, 0.3, 0.2); lg.rectangle("fill", x - 1, h.y - 8, 2, 2) end
     end
+  end
+end
+
+-- vento: strisce che attraversano lo schermo nel verso della raffica
+local function draw_wind(game, time)
+  local wd = game.wind
+  if not wd then return end
+  local W, H = game.world.width, game.world.height
+  if wd.warn > 0 then
+    -- preavviso: frecce che lampeggiano ai bordi del lato verso cui si soffia
+    if floor(time * 6) % 2 == 0 then
+      lg.setColor(0.8, 0.95, 1, 0.7)
+      for k = 1, 5 do
+        local y = H * k / 6
+        local x = wd.dir > 0 and W - 30 or 30
+        lg.polygon("fill", x + wd.dir * 12, y, x - wd.dir * 4, y - 8, x - wd.dir * 4, y + 8)
+      end
+    end
+    return
+  end
+  lg.setColor(0.85, 0.95, 1, 0.35)
+  for i = 1, 70 do
+    local spd = 500 + (i % 7) * 60
+    local x = ((i * 137.7) + time * spd * wd.dir) % (W + 80) - 40
+    local y = (i * 61.3 + sin(time * 2 + i) * 6) % H
+    lg.rectangle("fill", x, y, 18 + (i % 4) * 6, 1)
   end
 end
 
@@ -956,12 +984,14 @@ function Render.game(game, time)
   Render.apply_camera()
   Look.back(game.world, Cam, time)
   Look.map(game.world, time)
+  Look.gadgets(game, time)
   draw_telegraphs(game, time)
   draw_items(game, time)
   Fx.draw_under()
   for _, p in ipairs(game.players) do draw_player(p, game, time) end
   draw_fields(game, time)
   draw_hazards(game, time)
+  draw_wind(game, time)
   draw_projectiles(game, time)
   draw_lava(game, time)
   Look.ambient(game.world, time)

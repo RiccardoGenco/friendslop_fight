@@ -1,6 +1,8 @@
 # Genera le mappe di gioco in src/maps/. Uso: python3 tools/genera_mappe.py
 # Ogni mappa e' 64 x 36 tile (1024 x 576 pixel). Righe e colonne partono da 0.
 # Simboli: # solido  = piattaforma  ^ spuntoni  S spawn  W spawner armi  C cassa
+#          B blocco distruttibile  < > nastro trasportatore  J molla  P Q portali (a coppie)
+# Piattaforme mobili: m.mover(riga, colonna, lunghezza, spostamento_colonne, spostamento_righe, periodo)
 import os
 
 COLS, ROWS = 64, 36
@@ -9,6 +11,7 @@ class Mappa:
     def __init__(self, nome):
         self.nome = nome
         self.g = [["."] * COLS for _ in range(ROWS)]
+        self.movers = []
         for c in range(COLS):
             self.g[0][c] = "#"
         for r in range(ROWS):
@@ -23,75 +26,135 @@ class Mappa:
     def put(self, r, c, ch):
         assert self.g[r][c] == ".", f"{self.nome}: ({r},{c}) occupato da {self.g[r][c]}"
         self.g[r][c] = ch
-    def specchio(self, fn):
-        # disegna un elemento e la sua copia simmetrica rispetto al centro
-        fn(lambda c: c)
-        fn(lambda c: COLS - 1 - c)
+    def mover(self, r, c, length, dc, dr, period, phase=0):
+        # in Lua le righe e le colonne partono da 1
+        self.movers.append((c + 1, r + 1, length, dc, dr, period, phase))
     def salva(self, file, descr):
         rows = ["".join(r) for r in self.g]
         assert all(len(r) == COLS for r in rows)
+        for ch in "PQ":
+            n = sum(r.count(ch) for r in rows)
+            assert n in (0, 2), f"{self.nome}: il portale {ch} compare {n} volte"
         with open(file, "w", encoding="utf-8") as f:
             f.write(f"-- Mappa generata da tools/genera_mappe.py: {self.nome}\n")
             f.write(f"-- {descr}\n")
-            f.write("-- Simboli: # solido  = piattaforma  ^ spuntoni  S spawn  W spawner armi  C cassa\n")
+            f.write("-- Simboli: # solido  = piattaforma  ^ spuntoni  S spawn  W armi  C cassa\n")
+            f.write("--          B distruttibile  < > nastro  J molla  P Q portali\n")
             f.write("return {\n  name = '%s',\n  rows = {\n" % self.nome)
             for r in rows:
                 f.write('    "%s",\n' % r)
+            f.write("  },\n  movers = {\n")
+            for (c, r, l, dc, dr, per, ph) in self.movers:
+                f.write("    { c = %d, r = %d, len = %d, dc = %d, dr = %d, period = %d, phase = %s },\n"
+                        % (c, r, l, dc, dr, per, ph))
             f.write("  },\n}\n")
 
 out = os.path.join(os.path.dirname(__file__), "..", "src", "maps")
 
 # ---------------------------------------------------------------- Arena
+# Colosseo in rovina: ponte di blocchi sopra la fossa di spuntoni, molle verso le tribune,
+# piattaforma mobile al centro, colonne in parte distruttibili, portali incrociati negli angoli.
 m = Mappa("Arena")
-m.fill(33, 0, 35, COLS - 1)                     # pavimento
-m.fill(32, 30, 32, 33, "^")                     # spuntoni al centro, sotto la piattaforma
-m.plat(27, 8, 17); m.plat(27, 46, 55)           # piattaforme basse
-m.plat(24, 26, 37)                              # piattaforma centrale
-m.fill(14, 20, 22, 21); m.fill(14, 42, 22, 43)  # colonne sospese (salto dalla parete)
-m.plat(18, 4, 12); m.plat(18, 51, 59)           # piattaforme laterali
-m.plat(12, 24, 39)                              # passerella alta
-m.plat(9, 6, 14); m.plat(9, 49, 57)             # angoli in alto
-for c in (4, 14, 24, 39, 49, 59):
+m.fill(33, 0, 35, COLS - 1)
+m.fill(33, 27, 33, 36, "B")                    # ponte sopra la fossa
+m.fill(34, 27, 34, 36, "^")                    # spuntoni sotto il ponte
+m.plat(28, 10, 18); m.plat(28, 45, 53)         # gradinate basse
+m.plat(21, 3, 9); m.plat(21, 54, 60)           # tribune raggiunte con le molle
+m.fill(13, 19, 18, 20); m.fill(13, 43, 18, 44) # colonne (salto dalla parete)
+m.fill(19, 19, 23, 20, "B"); m.fill(19, 43, 23, 44, "B")   # base delle colonne: si sbriciola
+m.plat(17, 24, 30); m.plat(17, 33, 39)         # passerella alta spezzata
+m.plat(10, 2, 12); m.plat(10, 51, 61)          # balconate in alto
+m.plat(8, 27, 36)                              # palco della cassa
+m.mover(25, 21, 5, 17, 0, 420)                 # piattaforma mobile centrale
+m.put(32, 6, "J"); m.put(32, 57, "J")
+m.put(32, 2, "P"); m.put(9, 61, "P")
+m.put(32, 61, "Q"); m.put(9, 2, "Q")
+for c in (4, 12, 22, 41, 51, 59):
     m.put(32, c, "S")
-m.put(26, 10, "S"); m.put(26, 53, "S")
-for r, c in ((23, 31), (11, 31), (26, 13), (26, 50), (17, 8), (17, 55), (32, 9), (32, 54)):
+m.put(27, 16, "S"); m.put(27, 47, "S")
+for r, c in ((32, 9), (32, 54), (27, 11), (27, 52), (20, 5), (20, 58), (16, 27), (16, 36), (9, 8), (9, 55)):
     m.put(r, c, "W")
-m.put(8, 32, "C")
-m.salva(os.path.join(out, "arena.lua"), "Aperta e simmetrica, due colonne sospese per il salto dalla parete.")
+m.put(7, 31, "C")
+m.salva(os.path.join(out, "arena.lua"), "Colosseo: ponte distruttibile sulla fossa, molle, piattaforma mobile, portali negli angoli.")
 
 # ---------------------------------------------------------------- Fabbrica
+# Nastri che trascinano verso le vasche di spuntoni, ascensori ai lati, torre su una pila
+# di casse distruttibili, molle verso le travi del soffitto.
 m = Mappa("Fabbrica")
 m.fill(33, 0, 35, COLS - 1)
-m.fill(14, 30, 32, 33)                          # torre centrale: divide la mappa, si scala dalle pareti
-m.fill(26, 1, 27, 8); m.fill(26, 55, 27, 62)    # mensole attaccate ai muri
+m.fill(33, 1, 33, 24, ">"); m.fill(33, 39, 33, 62, "<")    # nastri verso il centro
+m.fill(32, 26, 32, 29, "^"); m.fill(32, 34, 32, 37, "^")   # vasche di spuntoni
+m.fill(15, 30, 24, 33)                                     # torre
+m.fill(25, 30, 32, 33, "B")                                # pila di casse sotto la torre
+m.plat(28, 9, 18); m.plat(28, 45, 54)
 m.plat(22, 12, 24); m.plat(22, 39, 51)
-m.fill(32, 18, 32, 20, "^"); m.fill(32, 43, 32, 45, "^")   # vasche di spuntoni
-m.fill(1, 15, 10, 16); m.fill(1, 47, 10, 48)    # travi che scendono dal soffitto
-m.plat(16, 3, 12); m.plat(16, 51, 60)
-m.plat(9, 22, 28); m.plat(9, 35, 41)
-for c in (4, 11, 25, 38, 52, 59):
+m.plat(16, 8, 16); m.plat(16, 47, 55)
+m.plat(9, 19, 27); m.plat(9, 36, 44)                       # travi alte
+m.fill(1, 15, 6, 16); m.fill(1, 47, 6, 48)                 # travi dal soffitto
+m.fill(10, 2, 11, 6, "B"); m.fill(10, 57, 11, 61, "B")     # casse impilate in alto
+m.mover(31, 2, 4, 0, -21, 480)                             # ascensori
+m.mover(31, 58, 4, 0, -21, 480, 0.5)
+m.put(21, 18, "J"); m.put(21, 45, "J")
+for c in (8, 16, 47, 55):
     m.put(32, c, "S")
-m.put(25, 4, "S"); m.put(25, 59, "S")
-for r, c in ((32, 8), (32, 55), (21, 18), (21, 45), (13, 31), (15, 7), (15, 56), (8, 25), (8, 38)):
+m.put(27, 12, "S"); m.put(27, 51, "S")
+for r, c in ((27, 15), (27, 48), (21, 14), (21, 49), (15, 11), (15, 52), (14, 31), (32, 20), (32, 43), (8, 23), (8, 40)):
     m.put(r, c, "W")
-m.put(4, 32, "C")
-m.salva(os.path.join(out, "fabbrica.lua"), "Torre centrale da scalare, travi dal soffitto, vasche di spuntoni.")
+m.put(4, 31, "C")
+m.salva(os.path.join(out, "fabbrica.lua"), "Nastri verso gli spuntoni, ascensori, torre su casse distruttibili, molle verso le travi.")
 
 # ---------------------------------------------------------------- Tetti
+# Palazzi sul vuoto (chi cade muore), una gondola che attraversa il burrone centrale,
+# un montacarichi nel vicolo, molle sui tetti, serbatoio distruttibile, portale tra i due estremi.
 m = Mappa("Tetti")
-m.fill(26, 1, 35, 12)                           # palazzo A
-m.fill(22, 17, 35, 27)                          # palazzo B
-m.fill(24, 36, 35, 46)                          # palazzo C
-m.fill(20, 51, 35, 62)                          # palazzo D
-m.fill(17, 20, 21, 21)                          # comignolo su B
-m.fill(15, 55, 19, 56)                          # comignolo su D
-m.fill(23, 44, 23, 45, "^")                     # antenna a spuntoni su C
-m.plat(25, 30, 33)                              # ponte sospeso nel vuoto
-m.plat(14, 5, 13); m.plat(11, 26, 37); m.plat(15, 40, 48)   # cartelloni
-for r, c in ((25, 3), (25, 9), (21, 18), (21, 25), (23, 38), (23, 42), (19, 52), (19, 60)):
+m.fill(24, 0, 35, 12)                          # palazzo A
+m.fill(21, 17, 35, 27)                         # palazzo B
+m.fill(23, 36, 35, 46)                         # palazzo C
+m.fill(19, 51, 35, COLS - 1)                   # palazzo D
+m.fill(16, 20, 20, 21)                         # comignolo di B
+m.fill(14, 58, 18, 59)                         # comignolo di D
+m.fill(19, 39, 22, 42, "B")                    # serbatoio dell'acqua
+m.plat(12, 2, 10); m.plat(12, 53, 61)          # cartelloni
+m.plat(11, 25, 38)                             # insegna centrale
+m.plat(15, 31, 38)                             # passerella sopra il burrone
+m.mover(23, 28, 3, 5, 0, 300)                  # gondola nel burrone
+m.mover(30, 47, 3, 0, -14, 360)                # montacarichi nel vicolo
+m.put(23, 6, "J"); m.put(18, 55, "J")
+m.put(23, 2, "P"); m.put(18, 61, "P")
+for r, c in ((23, 4), (23, 9), (20, 18), (20, 25), (22, 37), (22, 45), (18, 53), (18, 60)):
     m.put(r, c, "S")
-for r, c in ((25, 6), (21, 24), (23, 40), (19, 58), (13, 9), (10, 31), (14, 44), (24, 31)):
+for r, c in ((23, 11), (11, 6), (20, 23), (22, 44), (18, 57), (10, 28), (10, 35), (11, 57), (14, 36)):
     m.put(r, c, "W")
-m.put(5, 32, "C")
-m.salva(os.path.join(out, "tetti.lua"), "Palazzi separati dal vuoto: chi cade muore. Comignoli per il salto dalla parete.")
+m.put(5, 31, "C")
+m.salva(os.path.join(out, "tetti.lua"), "Palazzi sul vuoto, gondola e montacarichi, molle sui tetti, serbatoio distruttibile.")
+
+# ---------------------------------------------------------------- Miniera
+# Pozzi con ascensori ai lati, una montagna con un tunnel di roccia da far saltare,
+# pareti di roccia distruttibili, ponteggi di legno, portali incrociati.
+m = Mappa("Miniera")
+m.fill(33, 0, 35, COLS - 1)
+m.fill(32, 15, 32, 17, "^"); m.fill(32, 46, 32, 48, "^")   # stalagmiti
+m.fill(26, 24, 32, 39)                                     # montagna
+m.fill(29, 24, 31, 39, "B")                                # tunnel ostruito
+m.fill(22, 28, 25, 35)                                     # cima
+m.fill(15, 20, 21, 20, "B"); m.fill(15, 43, 21, 43, "B")   # pareti di roccia
+m.plat(28, 6, 13); m.plat(28, 50, 57)
+m.plat(23, 9, 18); m.plat(23, 45, 54)
+m.plat(18, 5, 12); m.plat(18, 51, 58)
+m.plat(14, 18, 26); m.plat(14, 37, 45)
+m.plat(9, 26, 37)
+for c in (8, 13, 22, 29, 34, 41, 50, 55):                  # stalattiti
+    m.fill(1, c, 2 + (c % 3), c)
+m.mover(31, 1, 3, 0, -22, 540)
+m.mover(31, 60, 3, 0, -22, 540, 0.5)
+m.put(21, 30, "J"); m.put(21, 33, "J")
+m.put(32, 8, "P"); m.put(13, 40, "P")
+m.put(32, 55, "Q"); m.put(13, 23, "Q")
+for c in (6, 11, 21, 42, 52, 57):
+    m.put(32, c, "S")
+m.put(25, 26, "S"); m.put(25, 37, "S")
+for r, c in ((27, 10), (27, 53), (22, 14), (22, 49), (17, 8), (17, 55), (8, 28), (8, 35), (13, 21), (13, 42)):
+    m.put(r, c, "W")
+m.put(4, 31, "C")
+m.salva(os.path.join(out, "miniera.lua"), "Ascensori nei pozzi, tunnel da far saltare, pareti di roccia distruttibili, portali incrociati.")
 print("mappe generate")

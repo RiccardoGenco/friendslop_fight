@@ -73,7 +73,7 @@ function Bot.think(game, index, level)
 
   -- si sposta dalle colonne degli eventi di mappa annunciati
   for _, h in ipairs(game.hazards or {}) do
-    if abs(h.x - p.x) < 26 and (h.phase ~= "warn" or h.t < 60) then
+    if abs(h.x - p.x) < (h.width or 12) / 2 + 16 and (h.phase ~= "warn" or h.t < 60) then
       inp.mx = (p.x >= h.x) and 1 or -1
     end
   end
@@ -91,13 +91,48 @@ function Bot.think(game, index, level)
     if danger then
       inp.jump_pressed = true          -- spuntoni davanti: salta (il salto tenuto li supera)
     elseif not ground_ahead then
-      if r() < 0.5 then inp.jump_pressed = true else inp.mx = 0 end
+      -- burrone: salta solo se c'e' un appoggio raggiungibile dall'altra parte
+      local landing = false
+      for d = 24, 150, 8 do
+        local lx = p.x + sign(inp.mx) * d
+        for dy = -48, 40, 8 do
+          local t = w:tile_at(lx, p.y + dy)
+          if (t == "#" or t == "=") and w:tile_at(lx, p.y + dy - 8) == "." then landing = true break end
+        end
+        if landing then break end
+      end
+      if landing and abs(p.vx) > 90 then inp.jump_pressed = true
+      elseif not landing or abs(p.vx) < 60 then inp.mx = landing and inp.mx or 0 end
     end
   end
   -- appena punto dagli spuntoni: salta e prosegue nella stessa direzione per uscirne
   if p.spike_cd > 0 then
     inp.jump_pressed = p.grounded or p.vy > 0
     inp.mx = (p.vx ~= 0) and sign(p.vx) or p.facing
+  end
+  -- cade nel vuoto: doppio salto e via verso il lato con un appoggio
+  if not p.grounded and p.vy > 60 then
+    local w = game.world
+    local void = true
+    for dy = 0, 220, 16 do
+      local t = w:tile_at(p.x, p.y + dy)
+      if t == "#" or t == "=" then void = false break end
+    end
+    if void then
+      inp.jump_pressed = true
+      local best, bd = 0, 1e9
+      for _, d in ipairs({ -1, 1 }) do
+        for dist = 16, 200, 16 do
+          local t = w:tile_at(p.x + d * dist, p.y + 8)
+          local t2 = w:tile_at(p.x + d * dist, p.y - 24)
+          if t == "#" or t == "=" or t2 == "#" then
+            if dist < bd then best, bd = d, dist end
+            break
+          end
+        end
+      end
+      if best ~= 0 then inp.mx = best end
+    end
   end
   -- in aria sopra gli spuntoni: usa il doppio salto
   if not p.grounded and p.vy > 0 and game.world:tile_at(p.x, p.y + 20) == "^" then

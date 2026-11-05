@@ -668,6 +668,8 @@ function Combat.explode(game, x, y, blast, owner, wid)
   if not blast then return end
   local world = game.world
   game:emit("explosion", x, y, { radius = blast.radius })
+  local broken = world:break_blocks(x, y, blast.radius * 0.75)
+  if #broken > 0 then game:emit("blocks_broken", x, y, { list = broken }) end
   for _, t in ipairs(game.players) do
     if t.alive and t.invuln <= 0 then
       local cx, cy = t.x, t.y - t.h / 2

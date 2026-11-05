@@ -1,6 +1,10 @@
 -- Mappa a tile e collisioni. Nessuna dipendenza da LÖVE.
 -- Simboli: # solido, = piattaforma attraversabile dal basso, ^ spuntoni,
---          S spawn giocatore, W spawner armi, C cassa centrale.
+--          S spawn giocatore, W spawner armi, C cassa centrale,
+--          B blocco distruttibile (solido finche' un'esplosione non lo rompe),
+--          < > nastro trasportatore (solido, trascina chi ci sta sopra),
+--          J molla (lancia in alto), P Q portali (due per lettera, collegati tra loro).
+-- Le piattaforme mobili sono nel campo movers della mappa (vedi src/sim/movers.lua).
 local data = require("src.sim.data")
 
 local World = {}
@@ -17,10 +21,16 @@ function World.new(map)
   w.grid = {}
   w.spawns, w.weapon_spawns = {}, {}
   w.crate = nil
+  w.breakable, w.belts = {}, {}
+  w.springs, w.portals = {}, {}
+  w.movers_def = map.movers or {}
+  w.version = 0          -- cresce quando la mappa cambia (blocchi rotti): la grafica la ridisegna
+  local pairs_seen = {}
   for r = 1, w.rows_n do
     local line = map.rows[r]
     assert(#line == w.cols, "riga " .. r .. " della mappa " .. tostring(map.name) .. " ha lunghezza diversa")
     w.grid[r] = {}
+    w.breakable[r], w.belts[r] = {}, {}
     for c = 1, w.cols do
       local ch = line:sub(c, c)
       local tile = "."
@@ -32,9 +42,25 @@ function World.new(map)
         w.weapon_spawns[#w.weapon_spawns + 1] = { x = (c - 0.5) * T, y = r * T }
       elseif ch == "C" then
         w.crate = { x = (c - 0.5) * T, y = r * T }
+      elseif ch == "B" then
+        tile = "#"
+        w.breakable[r][c] = true
+      elseif ch == "<" or ch == ">" then
+        tile = "#"
+        w.belts[r][c] = (ch == ">") and 1 or -1
+      elseif ch == "J" then
+        w.springs[#w.springs + 1] = { x = (c - 0.5) * T, y = r * T, c = c, r = r }
+      elseif ch == "P" or ch == "Q" then
+        local pt = { x = (c - 0.5) * T, y = r * T, pair = ch }
+        w.portals[#w.portals + 1] = pt
+        local other = pairs_seen[ch]
+        if other then pt.to, other.to = other, pt else pairs_seen[ch] = pt end
       end
       w.grid[r][c] = tile
     end
+  end
+  for _, pt in ipairs(w.portals) do
+    assert(pt.to, "portale " .. pt.pair .. " senza compagno nella mappa " .. tostring(map.name))
   end
   w.width = w.cols * T
   w.height = w.rows_n * T
@@ -133,6 +159,37 @@ function World:standing_on_oneway(b)
     if t == "=" then oneway = true end
   end
   return oneway
+end
+
+-- direzione del nastro sotto i piedi del corpo (0 se non c'e')
+function World:belt_under(b)
+  local T = data.tile
+  local r = floor((b.y + 1) / T) + 1
+  local c = floor(b.x / T) + 1
+  local row = self.belts[r]
+  return row and row[c] or 0
+end
+
+-- Rompe i blocchi distruttibili entro il raggio. Ritorna l'elenco dei centri rotti.
+function World:break_blocks(x, y, radius)
+  local T = data.tile
+  local broken = {}
+  local c0, c1 = floor((x - radius) / T) + 1, floor((x + radius) / T) + 1
+  local r0, r1 = floor((y - radius) / T) + 1, floor((y + radius) / T) + 1
+  for r = math.max(1, r0), math.min(self.rows_n, r1) do
+    for c = math.max(1, c0), math.min(self.cols, c1) do
+      if self.breakable[r][c] then
+        local cx, cy = (c - 0.5) * T, (r - 0.5) * T
+        if (cx - x) ^ 2 + (cy - y) ^ 2 <= (radius + T * 0.5) ^ 2 then
+          self.breakable[r][c] = nil
+          self.grid[r][c] = "."
+          broken[#broken + 1] = { x = cx, y = cy }
+        end
+      end
+    end
+  end
+  if #broken > 0 then self.version = self.version + 1 end
+  return broken
 end
 
 -- true se il rettangolo tocca almeno un tile del tipo dato

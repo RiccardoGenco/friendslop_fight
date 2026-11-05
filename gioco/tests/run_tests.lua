@@ -1206,6 +1206,103 @@ test("eventi di mappa: partono da soli e sono deterministici", function()
   check(n1 == n2 and c1 == c2, "non deterministico")
 end)
 
+-- ---------------------------------------------------------------------------
+-- Elementi delle mappe: molle, nastri, portali, blocchi distruttibili, piattaforme mobili
+
+do
+  local row = function(str) return "#" .. str .. string.rep(".", 62 - #str) .. "#" end
+  local rows = { string.rep("#", 64) }
+  for _ = 2, 33 do rows[#rows + 1] = row("") end
+  rows[20] = row("..S...........................................................")
+  rows[21] = row("..W...........................................................")
+  -- riga 33: J sopra il pavimento, P e P dei portali
+  rows[33] = row("....J.........P...........S.................P......S..........")
+  rows[34] = "#" .. string.rep("#", 20) .. string.rep(">", 10) .. string.rep("B", 6) .. string.rep("#", 26) .. "#"
+  rows[35] = string.rep("#", 64)
+  rows[36] = string.rep("#", 64)
+  package.preload["src.maps.test_gadgets"] = function()
+    return { name = "TestGadget", rows = rows,
+             movers = { { c = 50, r = 25, len = 4, dc = 6, dr = 0, period = 240 } } }
+  end
+end
+
+local function gadget_game()
+  local g = Game.new({ players = 2, seed = 3, first_map = "test_gadgets", maps = { "test_gadgets" } })
+  start_playing(g)
+  g.items, g.telegraphs = {}, {}
+  g.spawn_timer, g.crate_timer, g.event_timer = 1e9, 1e9, 1e9
+  local p1, p2 = g.players[1], g.players[2]
+  p2.x, p2.y = 900, 33 * data.tile
+  return g, p1, p2
+end
+
+test("molla: chi ci sale sopra vola in alto", function()
+  local g, p1 = gadget_game()
+  local sp = g.world.springs[1]
+  p1.x, p1.y, p1.vx, p1.vy = sp.x, sp.y, 0, 0
+  run(g, 3)
+  local top = p1.y
+  run(g, 20, function() top = math.min(top, p1.y) end)
+  check(33 * data.tile - top > 120, "salita solo di " .. (33 * data.tile - top))
+end)
+
+test("nastro: trascina chi sta fermo sopra", function()
+  local g, p1 = gadget_game()
+  p1.x, p1.y, p1.vx, p1.vy = 22 * data.tile, 33 * data.tile, 0, 0
+  local x0 = p1.x
+  run(g, 30)
+  check(p1.x > x0 + 20, "spostato di " .. (p1.x - x0))
+end)
+
+test("portale: si esce dall'altro e non si rimbalza indietro", function()
+  local g, p1 = gadget_game()
+  local a, b = g.world.portals[1], g.world.portals[2]
+  p1.x, p1.y, p1.vx, p1.vy = a.x, a.y, 0, 0
+  run(g, 2)
+  check(math.abs(p1.x - b.x) < 2, "non teletrasportato: x=" .. p1.x)
+  run(g, 120)
+  check(math.abs(p1.x - b.x) < 2, "rimbalzato indietro: x=" .. p1.x)
+end)
+
+test("blocchi distruttibili: un'esplosione li rompe e si cade nel buco", function()
+  local g = gadget_game()
+  local w = g.world
+  local x, y = 33.5 * data.tile, 33 * data.tile
+  check(w:tile_at(x, y + 4) == "#", "il blocco non c'e'")
+  Combat.explode(g, x, y - 4, { radius = 40, dmg = 0, kb = 0 })
+  check(w:tile_at(x, y + 4) == ".", "il blocco non si e' rotto")
+  check(w.version > 0, "versione della mappa non aggiornata")
+end)
+
+test("piattaforma mobile: porta con se' chi ci sta sopra", function()
+  local g, p1 = gadget_game()
+  local m = g.movers[1]
+  p1.x, p1.y, p1.vx, p1.vy = m.x + m.w / 2, m.y - 2, 0, 0
+  run(g, 5)
+  check(p1.grounded and p1.on_mover == m.id, "non e' salito sulla piattaforma")
+  local dx0 = p1.x - m.x
+  run(g, 60)
+  check(p1.on_mover == m.id, "e' caduto dalla piattaforma")
+  check(math.abs((p1.x - m.x) - dx0) < 1.5, "non si muove con la piattaforma")
+end)
+
+test("eventi di mappa: l'intensita' sale durante il round", function()
+  local g = on_map("arena")
+  local function count(frames)
+    local n = 0
+    for _ = 1, frames do
+      g:update({})
+      for _, e in ipairs(g:drain_events()) do if e.type == "map_event" then n = n + 1 end end
+      for _, p in ipairs(g.players) do p.hp, p.alive = 100, true end
+    end
+    return n
+  end
+  local early = count(1200)
+  g.round_frame = data.map_events.ramp
+  local late = count(1200)
+  check(late > early, "eventi a inizio " .. early .. ", a fine rampa " .. late)
+end)
+
 local function main()
   for _, t in ipairs(tests) do
     local ok, err = pcall(t.fn)
