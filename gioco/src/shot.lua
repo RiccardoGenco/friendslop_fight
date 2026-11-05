@@ -134,7 +134,7 @@ local function gallery(canvas)
       local p = { x = 0, y = 0, facing = 1, id = hi, vx = po.vx, vy = po.vy, grounded = po.grounded,
                   action = po.action, sliding = po.sliding, wall = po.wall }
       lg.push()
-      lg.translate(14 + (pi - 1) * 27, 32 + (hi - 1) * 40)
+      lg.translate(16 + (pi - 1) * 27, 40 + (hi - 1) * 46)
       lg.scale(1.5)
       Heroes.draw(h.id, 1, p, data.colors[hi], 1, false, 0.3, { dist = po.dist or 0 })
       lg.pop()
