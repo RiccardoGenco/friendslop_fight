@@ -573,7 +573,7 @@ local function draw_heroes(time, W, H)
     end
     -- miniatura della skin
     local sown = Profile.skin_owned(h, i)
-    Menu.draw_hero(h.id, i, x + 34 + 4 * k, y + 28, 1, data.colors[1], time, false, sown and 1 or 0.35, i)
+    Menu.draw_hero(h.id, i, x + 34 + 4 * k, y + 28, 0.7, data.colors[1], time, false, sown and 1 or 0.35, i)
     Render.text(s.name, x + 54 + 4 * k, y + 4, on and UI.gold or UI.text, "mid", "left", 140)
     local lock, price = Profile.lock_text(h, i)
     if not lock then
@@ -621,7 +621,7 @@ local function draw_heroes(time, W, H)
     setc(lerpc(UI.panel, UI.panel_l, kk)); lg.rectangle("fill", cx - 22, cy, 44, 44, 6, 6)
     if kk > 0.05 then lg.setColor(UI.gold[1], UI.gold[2], UI.gold[3], kk); lg.rectangle("line", cx - 22.5, cy - 0.5, 45, 45, 6, 6) end
     local own = Profile.hero_owned(hh)
-    Menu.draw_hero(hh.id, 1, cx, cy + 40, 1.3, data.colors[1], time, on and "run" or false, own and 1 or 0.3, i)
+    Menu.draw_hero(hh.id, 1, cx, cy + 41, 1.0, data.colors[1], time, on and "run" or false, own and 1 or 0.3, i)
     if not own then lock_icon(cx + 12, cy + 6, 0.9) end
     hit(cx - 22, cy, 44, 44, nil, function() if Menu.hero ~= i then hero_step(i - Menu.hero) end end)
   end
