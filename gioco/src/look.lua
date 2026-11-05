@@ -415,71 +415,16 @@ function Look.ambient(w, time)
 end
 
 -- ---------------------------------------------------------------------------
--- Personaggio: testa con visiera, busto, gambe, sciarpa. Piedi in (x, y).
+-- Personaggio: l'animale scelto da quel giocatore (vedi src/heroes.lua).
+-- Look.loadout[id] = { hero = "gatto", skin = 1 }, impostato da main all'avvio della partita.
 
-local BLACK = { 0.03, 0.03, 0.05 }
+local Heroes = require("src.heroes")
+Look.loadout = {}
 
 function Look.player(p, c, alpha, ps, time)
-  local x, y = floor(p.x), floor(p.y)
-  local f = p.facing
-  if p.sliding and p.wall ~= 0 then f = -p.wall end   -- sul muro guarda via dalla parete
-  local light = { min(1, c[1] * 0.7 + 0.35), min(1, c[2] * 0.7 + 0.35), min(1, c[3] * 0.7 + 0.35) }
-  local dark = { c[1] * 0.5, c[2] * 0.5, c[3] * 0.5 }
-  local dash = p.action and p.action.type == "dash"
-  local bob, l1, l2, k1, k2 = 0, 0, 0, 0, 0     -- l = spostamento gamba, k = sollevamento piede
-  local hand = nil
-  if dash then
-    l1, l2, k1, k2 = -2, -4, 1, 2
-  elseif p.sliding then
-    l1, l2, k1, k2 = -1, -3, 2, 0
-    hand = { -6, -13 }
-  elseif not p.grounded then
-    if p.vy < -40 then l1, l2, k1, k2 = 1, -2, 2, 1
-    else l1, l2, k1, k2 = 2, -2, 0, 1 end
-  elseif abs(p.vx) > 20 then
-    local ph = (ps.dist or 0) / 6
-    l1 = floor(sin(ph) * 3 + 0.5); l2 = -l1
-    k1 = floor(max(0, cos(ph)) * 2 + 0.5); k2 = floor(max(0, -cos(ph)) * 2 + 0.5)
-    bob = (abs(sin(ph)) > 0.7) and -1 or 0
-  else
-    bob = (sin(time * 2.5 + p.id * 1.7) > 0.4) and 1 or 0
-  end
-  local blink = ((time + p.id * 0.7) % 3.3) < 0.12
-  local sw = 2 + min(5, floor(abs(p.vx) / 35))
-  local fl = floor(sin(time * 16 + p.id) * (abs(p.vx) > 40 and 1 or 0.4) + 0.5)
-
-  local parts = {
-    { dark, -4 + l2, -5 + k2 - k2, 3, 5 - k2 },        -- gamba dietro
-    { dark, 1 + l1, -5, 3, 5 - k1 },                    -- gamba davanti
-    { c, -5, -13 + bob, 10, 8 },                        -- busto
-    { light, -5, -21 + bob, 10, 8 },                    -- testa
-    { dark, -5 - sw, -13 + bob + fl, sw, 2 },           -- sciarpa
-  }
-  if hand then parts[#parts + 1] = { light, hand[1], hand[2] + bob, 2, 2 } end
-  lg.push()
-  lg.translate(x, y)
-  lg.scale(f, 1)
-  if dash then lg.shear(-0.25, 0) end
-  for pass = 1, 2 do
-    for _, q in ipairs(parts) do
-      if pass == 1 then
-        lg.setColor(BLACK[1], BLACK[2], BLACK[3], alpha)
-        rect(q[2] - 1, q[3] - 1, q[4] + 2, q[5] + 2)
-      else
-        lg.setColor(q[1][1], q[1][2], q[1][3], alpha)
-        rect(q[2], q[3], q[4], q[5])
-      end
-    end
-  end
-  -- visiera e occhio
-  lg.setColor(0.08, 0.08, 0.12, alpha)
-  rect(0, -18 + bob, 5, 3)
-  lg.setColor(1, 1, 1, alpha)
-  rect(2, blink and -17 + bob or -18 + bob, 2, blink and 1 or 2)
-  -- cintura
-  lg.setColor(dark[1], dark[2], dark[3], alpha)
-  rect(-5, -7 + bob, 10, 1)
-  lg.pop()
+  local lo = Look.loadout[p.id] or { hero = Heroes.list[(p.id - 1) % #Heroes.list + 1].id, skin = 1 }
+  local flash = c[1] == 1 and c[2] == 1 and c[3] == 1
+  Heroes.draw(lo.hero, lo.skin, p, data.colors[p.id] or c, alpha, flash, time, ps)
 end
 
 return Look

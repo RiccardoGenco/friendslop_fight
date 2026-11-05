@@ -37,6 +37,14 @@ math.randomseed(tonumber(arg and arg[1]) or 42)
 dofile("main.lua")
 love.load({})
 local function key(k) love.keypressed(k) end
+local function frame() love.update(1 / 60); love.draw() end
+-- giro nei menu: personaggi (scorri, prova a comprare), obiettivi, poi Gioca
+for _, k in ipairs({ "down", "return", "right", "down", "return", "left", "up", "return", "escape",
+                     "down", "return", "down", "escape", "up", "up" }) do
+  key(k); frame()
+end
+for _ = 1, 30 do frame() end
+key("return")
 key("f1")
 for _ = 1, 5 do key("f10") end
 key("return")

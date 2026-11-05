@@ -409,7 +409,7 @@ function Player.update(p, inp, game)
         p.grounded = false
         p.buf.jump = 0
         p.jump_cut_done = false
-        game:emit("jump", p.x, p.y)
+        game:emit("jump", p.x, p.y, { id = p.id })
       elseif p.wall_t > 0 and not p.grounded and not (p.action and p.action.type == "dash") then
         -- salto dalla parete: spinge via dal muro e restituisce il doppio salto
         local away = mx * p.wall_dir < -0.3
@@ -423,13 +423,13 @@ function Player.update(p, inp, game)
         p.air_jumps = P.air_jumps
         p.buf.jump = 0
         p.jump_cut_done = false
-        game:emit("walljump", p.x + p.wall_dir * p.w / 2, p.y - p.h / 2)
+        game:emit("walljump", p.x + p.wall_dir * p.w / 2, p.y - p.h / 2, { id = p.id })
       elseif p.air_jumps > 0 and not p.grounded and not (p.action and p.action.type == "dash") then
         p.vy = -P.double_jump_vel
         p.air_jumps = p.air_jumps - 1
         p.buf.jump = 0
         p.jump_cut_done = false
-        game:emit("doublejump", p.x, p.y)
+        game:emit("doublejump", p.x, p.y, { id = p.id })
       end
     end
     if not inp.jump_held and p.vy < 0 and not p.jump_cut_done then

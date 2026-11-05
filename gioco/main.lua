@@ -12,11 +12,15 @@ local Audio = require("src.audio")
 local Sprites = require("src.sprites")
 local Debug = require("src.debug")
 local Bot = require("src.bot")
+local Profile = require("src.profile")
+local Menu = require("src.menu")
+local Heroes = require("src.heroes")
+local Look = require("src.look")
 
 local lg = love.graphics
 
 local STEP = data.dt
-local state = "lobby"        -- lobby | game | pause | matchend
+local state = "menu"         -- menu | lobby | game | pause | matchend
 local pause_reason = nil
 local game
 local canvas
@@ -46,6 +50,7 @@ function love.load(args)
   Render.load()
   Audio.load()
   Sprites.load()
+  Profile.load()
   love.mouse.setVisible(false)
 end
 
@@ -56,8 +61,19 @@ local function new_seed()
   return math.floor(os.time() + love.timer.getTime() * 1000) % 2147483646
 end
 
+local ensure_loadouts
+
+local function is_human(id)
+  local s = Input.slots[id]
+  return s ~= nil and s.kind ~= "bot"
+end
+
 local function start_game()
+  ensure_loadouts()
   game = Game.new({ players = Input.count(), seed = new_seed() })
+  Look.loadout = {}
+  for i, s in ipairs(Input.slots) do Look.loadout[i] = { hero = s.hero, skin = s.skin } end
+  Profile.start_match()
   Fx.reset()
   Input.clear_pending()
   acc, slow_frames = 0, 0
@@ -69,6 +85,96 @@ local function fill_and_start()
   if Input.count() == 0 then Input.add_keyboard(1) end
   while Input.count() < 3 do Input.add_bot() end
   start_game()
+end
+
+-- ---------------------------------------------------------------------------
+-- Scelta del personaggio nella lobby (solo tra quelli sbloccati)
+
+local function cycle_hero(s, d)
+  local hs = {}
+  for _, h in ipairs(Heroes.list) do if Profile.hero_owned(h) or s.kind == "bot" then hs[#hs + 1] = h end end
+  local cur = 1
+  for i, h in ipairs(hs) do if h.id == s.hero then cur = i end end
+  local h = hs[(cur - 1 + d) % #hs + 1]
+  s.hero, s.skin = h.id, 1
+end
+
+local function cycle_skin(s, d)
+  local h = Heroes.get(s.hero)
+  local i = s.skin
+  for _ = 1, #h.skins do
+    i = (i - 1 + d) % #h.skins + 1
+    if Profile.skin_owned(h, i) then s.skin = i return end
+  end
+end
+
+local function hero_taken(s)
+  for _, o in ipairs(Input.slots) do
+    if o ~= s and o.hero == s.hero and o.kind ~= "bot" then return true end
+  end
+  return false
+end
+
+function ensure_loadouts()
+  for _, s in ipairs(Input.slots) do
+    if not s.hero then
+      if s.kind == "bot" then
+        local h = Heroes.list[love.math.random(#Heroes.list)]
+        s.hero, s.skin = h.id, 1
+      else
+        local fav = Profile.data.fav
+        local h = Heroes.get(fav.hero)
+        if Profile.skin_owned(h, fav.skin) then s.hero, s.skin = h.id, fav.skin
+        else s.hero, s.skin = "gatto", 1 end
+        for _ = 1, #Heroes.list do
+          if not hero_taken(s) then break end
+          cycle_hero(s, 1)
+        end
+      end
+    end
+  end
+end
+
+local function lobby_slot_press(s, b)
+  if not s or s.kind == "bot" then return end
+  if b == "left" then cycle_hero(s, -1) elseif b == "right" then cycle_hero(s, 1)
+  elseif b == "up" then cycle_skin(s, -1) elseif b == "down" then cycle_skin(s, 1) end
+end
+
+local function to_menu()
+  state = "menu"
+  Menu.open("main")
+end
+
+local function menu_press(b)
+  local r = Menu.press(b)
+  if r == "play" then
+    state = "lobby"
+    Input.clear_pending()
+  elseif r == "quit" then
+    love.event.quit()
+  end
+end
+
+-- levetta sinistra nei menu: un passo per ogni spinta
+local stick_prev = {}
+local function poll_menu_sticks()
+  if not (love.joystick and love.joystick.getJoysticks) then return end
+  for _, j in ipairs(love.joystick.getJoysticks()) do
+    if j:isGamepad() then
+      local x, y = j:getGamepadAxis("leftx"), j:getGamepadAxis("lefty")
+      local dir = nil
+      if y < -0.6 then dir = "up" elseif y > 0.6 then dir = "down"
+      elseif x < -0.6 then dir = "left" elseif x > 0.6 then dir = "right" end
+      if dir and stick_prev[j] ~= dir then
+        if state == "menu" then menu_press(dir)
+        elseif state == "lobby" then
+          for _, s in ipairs(Input.slots) do if s.joy == j then lobby_slot_press(s, dir) end end
+        end
+      end
+      stick_prev[j] = dir
+    end
+  end
 end
 
 local function to_lobby()
@@ -102,6 +208,7 @@ local function step()
   game:update(inputs)
   for _, e in ipairs(game:drain_events()) do
     Fx.handle(e, game)
+    Profile.event(e, is_human)
     if e.type == "round_end" then slow_frames = 80 end
   end
   Fx.track(game)
@@ -116,8 +223,14 @@ function love.update(dt)
   time = time + dt
   Input.poll()
   Debug.update(dt)
+  Profile.update(dt)
+  Menu.update(dt)
+  poll_menu_sticks()
 
-  if state == "lobby" then
+  if state == "menu" then
+    -- niente: il menu reagisce ai tasti
+  elseif state == "lobby" then
+    ensure_loadouts()
     if Input.start_pressed() and Input.count() >= 1 then fill_and_start() end
   elseif state == "game" then
     if Input.start_pressed() then
@@ -159,53 +272,44 @@ end
 
 local function draw_lobby()
   local W, H = Render.W, Render.H
-  for i = 0, 11 do
-    lg.setColor(0.05 + 0.04 * i / 11, 0.06 + 0.03 * i / 11, 0.12 + 0.08 * i / 11)
-    lg.rectangle("fill", 0, i * 30, W, 30)
-  end
-  Render.text("PARTY GAME", W / 2, 22, { 1, 0.9, 0.3 }, "big", "center", W)
-  Render.text("prototipo v0.3 - 2-6 giocatori, ultimo in piedi vince", W / 2, 62, { 0.8, 0.85, 1 }, "small", "center", W)
-
+  Look.sky({ name = "Tetti" }, time, W, H)
+  Render.text("SCEGLI IL COMBATTENTE", W / 2, 10, { 1, 0.9, 0.3 }, "big", "center", W)
   for i = 1, 6 do
-    local x = 40 + ((i - 1) % 3) * 190
-    local y = 90 + math.floor((i - 1) / 3) * 70
+    local x = 28 + ((i - 1) % 3) * 200
+    local y = 54 + math.floor((i - 1) / 3) * 110
     local s = Input.slots[i]
     local c = data.colors[i]
     lg.setColor(c[1], c[2], c[3], s and 1 or 0.18)
-    lg.rectangle("fill", x, y, 170, 56)
-    lg.setColor(0, 0, 0, s and 0.55 or 0.7)
-    lg.rectangle("fill", x + 2, y + 2, 166, 52)
-    if s then
-      Render.text(data.color_names[i], x + 10, y + 8, c, "mid")
-      Render.text(s.name or "", x + 10, y + 30, { 1, 1, 1 }, "small")
-      if s.kind == "pad" then
-        Render.text("B per uscire", x + 10, y + 41, { 0.6, 0.6, 0.7 }, "small")
+    lg.rectangle("fill", x, y, 184, 102, 6, 6)
+    lg.setColor(0.03, 0.03, 0.07, s and 0.82 or 0.75)
+    lg.rectangle("fill", x + 2, y + 2, 180, 98, 5, 5)
+    if s and s.hero then
+      local h = Heroes.get(s.hero)
+      lg.setColor(0, 0, 0, 0.4)
+      lg.ellipse("fill", x + 40, y + 90, 22, 4)
+      Menu.draw_hero(s.hero, s.skin, x + 40, y + 90, 3, c, time, false, 1, i)
+      Render.text(data.color_names[i], x + 80, y + 8, c, "mid", "left", 100)
+      Render.text(h.name, x + 80, y + 30, { 1, 1, 1 }, "small", "left", 100)
+      Render.text(h.skins[s.skin].name, x + 80, y + 42, { 0.7, 0.75, 0.9 }, "small", "left", 100)
+      Render.text(s.name or "", x + 80, y + 60, { 0.55, 0.55, 0.65 }, "small", "left", 100)
+      if s.kind ~= "bot" then
+        Render.text("<> eroe   su/giu skin", x + 80, y + 84, { 0.5, 0.55, 0.7 }, "small", "left", 100)
       end
     else
-      Render.text("libero", x + 10, y + 20, { 0.5, 0.5, 0.6 }, "mid")
+      Render.text("libero", x + 92, y + 42, { 0.5, 0.5, 0.6 }, "mid", "center", 184)
     end
   end
 
   local n = Input.count()
-  if n >= 2 then
-    Render.text("START (o Invio) per iniziare", W / 2, 238, { 0.5, 1, 0.5 }, "mid", "center", W)
-  elseif n == 1 then
-    Render.text("START (o Invio): parti da solo contro 2 bot", W / 2, 238, { 0.5, 1, 0.5 }, "mid", "center", W)
-  else
-    Render.text("Invio: tastiera + 2 bot   oppure premi un tasto del controller", W / 2, 238, { 1, 1, 1 }, "mid", "center", W)
-  end
-  Render.text("F1/F2 tastiera   F10 aggiungi bot   Esc esci", W / 2, 266, { 0.6, 0.7, 0.9 }, "small", "center", W)
-  Render.text("Controller: levetta sinistra muovi, levetta destra mira, A salta, X/RT attacco,",
-    W / 2, 280, { 0.6, 0.7, 0.9 }, "small", "center", W)
-  Render.text("B scatto, LB/RB/LT parry, Y raccogli/lancia.  Tastiera 1: WASD + mouse (click attacca)",
-    W / 2, 290, { 0.6, 0.7, 0.9 }, "small", "center", W)
-  Render.text("Giu + salto su una piattaforma: scendi", W / 2, 300, { 0.6, 0.7, 0.9 }, "small", "center", W)
+  local msg = (n >= 2 and "START (o Invio) per iniziare")
+    or (n == 1 and "START (o Invio): parti da solo contro 2 bot")
+    or "Invio: tastiera + 2 bot   oppure premi un tasto del controller"
+  Render.text(msg, W / 2, 280, { 0.5, 1, 0.5 }, "mid", "center", W)
+  Render.text("F1/F2 tastiera   F10 bot   Backspace togli   Esc menu   Tastiera 1: A D W S   Tastiera 2: frecce",
+    W / 2, 304, { 0.6, 0.7, 0.9 }, "small", "center", W)
   Render.text("In gioco: F3 hitbox  F4 slow  F5 pausa  F6 frame  F7 ricarica dati  F8 taratura",
-    W / 2, 316, { 0.5, 0.6, 0.75 }, "small", "center", W)
-  if menu_msg then Render.text(menu_msg, W / 2, 338, { 1, 0.6, 0.4 }, "small", "center", W) end
-  if not Sprites.player then
-    Render.text("sprite: nessuno (rettangoli colorati) - vedi assets/README.md", W / 2, 348, { 0.5, 0.55, 0.65 }, "small", "center", W)
-  end
+    W / 2, 318, { 0.5, 0.6, 0.75 }, "small", "center", W)
+  if menu_msg then Render.text(menu_msg, W / 2, 340, { 1, 0.6, 0.4 }, "small", "center", W) end
 end
 
 local function draw_overlay_pause()
@@ -234,6 +338,13 @@ local function draw_overlay_matchend()
   for i = 1, #game.players do
     Render.text(data.color_names[i] .. ": " .. game.scores[i], W / 2, 140 + (i - 1) * 16, data.colors[i], "mid", "center", W)
   end
+  local m = Profile.match
+  if m then
+    Render.text("+" .. m.coins .. " monete   (totale " .. Profile.data.coins .. ")", W / 2, 236, { 1, 0.85, 0.3 }, "mid", "center", W)
+    if #m.unlocked > 0 then
+      Render.text("Obiettivi: " .. table.concat(m.unlocked, ", "), W / 2, 258, { 0.5, 1, 0.6 }, "small", "center", W)
+    end
+  end
   Render.text("A / Invio: rivincita      B / Esc: lobby", W / 2, 285, { 0.9, 0.9, 1 }, "small", "center", W)
 end
 
@@ -256,7 +367,9 @@ function love.draw()
   lg.clear(0, 0, 0, 1)
   lg.push()
   lg.scale(Render.SS)
-  if state == "lobby" then
+  if state == "menu" then
+    Menu.draw(time)
+  elseif state == "lobby" then
     draw_lobby()
   elseif game then
     lg.push()
@@ -269,6 +382,7 @@ function love.draw()
     Debug.draw(game, love.timer.getFPS())
     draw_crosshair()
   end
+  if state ~= "menu" then Menu.draw_toasts(Render.W) end
   lg.pop()
   lg.setCanvas()
 
@@ -306,11 +420,28 @@ function love.joystickremoved(joy)
   Input.joystick_removed(joy)
 end
 
+local GAMEPAD_MENU = { dpup = "up", dpdown = "down", dpleft = "left", dpright = "right",
+                       a = "ok", start = "ok", b = "back", back = "back" }
+
+function love.gamepadpressed(joy, button)
+  local b = GAMEPAD_MENU[button]
+  if not b then return end
+  if state == "menu" then
+    menu_press(b)
+  elseif state == "lobby" then
+    for _, s in ipairs(Input.slots) do
+      if s.joy == joy and s.join_t ~= time then lobby_slot_press(s, b) end
+    end
+  end
+end
+
 function love.joystickpressed(joy, button)
+  if state == "menu" then return end
   if state == "lobby" then
     if not Input.has_joystick(joy) then
       if joy:isGamepad() then
-        Input.add_joystick(joy)
+        local s = Input.add_joystick(joy)
+        if s then s.join_t = time end
         menu_msg = nil
       else
         menu_msg = "Controller non riconosciuto come gamepad standard (SDL)"
@@ -332,14 +463,26 @@ function love.keypressed(key)
     love.window.setFullscreen(not love.window.getFullscreen())
     return
   end
+  if state == "menu" then
+    local map = { up = "up", w = "up", down = "down", s = "down", left = "left", a = "left",
+                  right = "right", d = "right", ["return"] = "ok", space = "ok", escape = "back", backspace = "back" }
+    if map[key] then menu_press(map[key]) end
+    return
+  end
   if state == "lobby" then
+    local kb1 = { a = "left", d = "right", w = "up", s = "down" }
+    local kb2 = { left = "left", right = "right", up = "up", down = "down" }
+    for _, sl in ipairs(Input.slots) do
+      if sl.kb == 1 and kb1[key] then lobby_slot_press(sl, kb1[key]) end
+      if sl.kb == 2 and kb2[key] then lobby_slot_press(sl, kb2[key]) end
+    end
     if key == "f1" then Input.add_keyboard(1)
     elseif key == "f2" then Input.add_keyboard(2)
     elseif key == "f10" then Input.add_bot()
     elseif key == "backspace" then Input.remove_last()
     elseif key == "return" then
       if Input.count() >= 2 then start_game() else fill_and_start() end
-    elseif key == "escape" then love.event.quit() end
+    elseif key == "escape" then to_menu() end
   elseif state == "game" then
     if key == "escape" then state, pause_reason = "pause", "pausa" end
   elseif state == "pause" then

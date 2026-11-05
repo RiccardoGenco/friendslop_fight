@@ -1,4 +1,4 @@
-# Party Game (prototipo v0.3)
+# Friendslop Fight (prototipo v0.5)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -10,7 +10,15 @@ Test della simulazione: `love . test` (oppure `luajit tests/run.lua`).
 Prova a secco della grafica con i bot: `luajit tests/smoke_love.lua`.
 Ritmo e bilanciamento con partite tra bot: `luajit tests/balance.lua [partite] [giocatori]`.
 
+## Menu principale
+All'avvio: Gioca, Personaggi, Obiettivi, Esci. Frecce/WASD o croce/levetta per muoversi, Invio/A per scegliere, Esc/B per tornare.
+- **Personaggi**: sei animali guerrieri (gatto ninja, rana samurai, orso pirata, volpe cowboy, coniglio vichingo, procione ladro), tre skin ciascuno. Si comprano con le monete; le skin leggendarie si sbloccano con gli obiettivi. Invio/A su uno sbloccato lo imposta come preferito.
+- **Obiettivi**: progressi e ricompense.
+- **Monete**: a fine partita, solo per i giocatori umani (partita giocata, eliminazioni, round e partite vinte).
+Il profilo si salva nella cartella dati di LÖVE (`profilo.lua`).
+
 ## Lobby
+Ogni giocatore sceglie l'eroe con sinistra/destra e la skin con su/giu (tastiera 1: A D W S, tastiera 2: frecce). I bot prendono un eroe a caso. Esc torna al menu.
 Premi un tasto qualsiasi del controller per entrare, B per uscire, Start o Invio per iniziare. F1/F2 aggiungono la tastiera 1/2, F10 aggiunge un bot, F11 schermo intero. Da soli si parte contro due bot.
 
 ## Comandi
