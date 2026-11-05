@@ -341,7 +341,7 @@ local function hero_image(hero, skin_i)
       img:setFilter("nearest", "nearest")
       local w, h = img:getDimensions()
       e = { img = img, w = w, h = h, ox = w / 2 }
-      -- foglio di pose: assets/heroes/<id>_<skin>.lua = { fw, fh, ox, frames }
+      -- foglio di pose: assets/heroes/<id>_<skin>.lua = { fw, fh, ox, frames [, scale] }
       -- ordine delle pose: fermo, corsa 1, corsa 2, salto, caduta, scatto
       local meta = "assets/heroes/" .. key .. ".lua"
       if love.filesystem.getInfo(meta) then
@@ -350,6 +350,7 @@ local function hero_image(hero, skin_i)
           e.quads = {}
           for i = 1, m.frames do e.quads[i] = love.graphics.newQuad((i - 1) * m.fw, 0, m.fw, m.fh, w, h) end
           e.w, e.h, e.ox = m.fw, m.fh, m.ox
+          e.scale = m.scale   -- porta ogni eroe alla stessa altezza in gioco (pixel nitidi, scalati al disegno)
         end
       end
     end
@@ -398,7 +399,7 @@ local function draw_image_hero(e, p, team, a, flash, time, ps)
     q = e.quads[math.min(pick, n)]
     if pick ~= 1 then sx, sy = 1 + (sx - 1) * 0.5, 1 + (sy - 1) * 0.5 end
   end
-  local s = S
+  local s = S * (e.scale or 1)
   lg.push()
   lg.translate(x, y + oy)
   lg.rotate(rot * f)
