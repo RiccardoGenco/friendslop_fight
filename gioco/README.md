@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.11)
+# Friendslop Fight (prototipo v0.12)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -48,15 +48,29 @@ Premi un tasto qualsiasi del controller per entrare, B per uscire, Start o Invio
 | Mira | levetta destra (360°) | mouse | direzione di movimento |
 | Salta | A | W / Spazio | su |
 | Attacco | X o RT (tieni premuto per le automatiche) | J o click sinistro | Z |
-| Scatto | B | K | X |
-| Parry | LB / RB / LT | L o click destro | C |
-| Raccogli / lancia | Y | U | V |
+| Scatto | B | Shift sinistro o K | X |
+| Parry | LB / LT | click destro, Q o L | C |
+| Scambia l'arma con quella a terra | tocco di Y | tocco di E (o U) | tocco di V |
+| Fondi con l'arma a terra | tieni premuto Y | tieni premuto E (o U) | tieni premuto V |
+| Lancia l'arma | RB | G | B |
+
+A mani nude si raccoglie passandoci sopra. Il tasto raccogli non lancia mai: per lanciare c'è un tasto apposta.
 
 Con la levetta destra a riposo si mira come prima (8 direzioni con la levetta sinistra, o davanti a sé).
 Mirando con la levetta destra il personaggio guarda dove mira, quindi si può indietreggiare sparando. Non c'è mirino: la direzione si legge dall'arma, che ruota verso dove miri.
 Tutti i proiettili seguono una traiettoria balistica (cadono con la distanza), quindi per colpire lontano si mira più in alto.
 
 Giù + salto su una piattaforma sottile: scendi. Doppio salto in aria. Contro un muro, tenendo premuto verso la parete, scivoli; salto dal muro ti stacca e ti restituisce il doppio salto.
+
+## Fusione delle armi
+Con un'arma in mano, fermati su un'arma a terra e tieni premuto il tasto raccogli per mezzo secondo: le due armi diventano una sola. Sopra il personaggio compare l'anteprima del risultato; durante la fusione si resta fermi e un colpo la interrompe. L'arma fusa riparte con le munizioni al massimo.
+- **Corpo + tratto:** l'arma in mano decide come si attacca, quella raccolta dona il suo tratto (fuoco, bolle, esplosivo, ritorno, rosa di colpi, raffica, perforante, uncino, rampino, scatto, guardia...). Due armi uguali danno la versione doppia.
+- **Limiti:** due armi al massimo; un'arma fusa non si fonde di nuovo; le armi mitiche non si fondono.
+- **Ricette speciali:** 14 combinazioni con un nome e un comportamento unico (in `src/sim/recipes.lua`). Finché non le scopri l'anteprima mostra "???". La prima scoperta rallenta il gioco e mostra il nome a tutto schermo.
+- **Ricettario** (menu principale): le ricette speciali con un indizio per quelle mancanti, e la griglia di tutte le fusioni normali.
+- **Armi a terra:** un'arma con munizioni lanciata, scambiata o caduta da un giocatore eliminato resta a terra 20 secondi (massimo 12 armi a terra). Le armi consumate si rompono.
+
+Il design completo è nel documento "Friendslop Fight — Fusione delle armi".
 
 ## Meccaniche
 - **Parry (Deflect):** riflette i proiettili e stordisce chi attacca in mischia. Il martello rompe la parata, tranne il **parry perfetto** (i primi 4 frame attivi).

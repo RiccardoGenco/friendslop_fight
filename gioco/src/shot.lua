@@ -1,6 +1,6 @@
 -- Modalita' foto per lo sviluppo: love . shot <scena> <cartella> [mappa]
 -- Avvia una scena, simula i tasti, salva PNG del gioco a frame stabiliti e chiude.
--- Scene: menu, heroes, achievements, settings, lobby, game, pause, matchend
+-- Scene: menu, heroes, achievements, settings, cookbook, lobby, game, pause, matchend, fusion, recipes
 
 local Shot = { frame = 0, steps = {}, shots = {} }
 
@@ -17,8 +17,17 @@ function Shot.start(args)
   if sc == "gallery" then snap(3, "gallery")
   elseif sc == "menu" then snap(90, "menu")
   elseif sc == "heroes" then at(5, key("down")); at(6, key("return")); snap(80, "heroes")
-  elseif sc == "achievements" then at(5, key("down")); at(6, key("down")); at(7, key("return")); snap(80, "achievements")
-  elseif sc == "settings" then for i = 1, 3 do at(4 + i, key("down")) end; at(9, key("return")); snap(80, "settings")
+  elseif sc == "achievements" then for i = 1, 3 do at(4 + i, key("down")) end; at(9, key("return")); snap(80, "achievements")
+  elseif sc == "settings" then for i = 1, 4 do at(4 + i, key("down")) end; at(10, key("return")); snap(80, "settings")
+  elseif sc == "cookbook" then
+    -- ricettario con qualche scoperta finta (non salvata)
+    at(3, function()
+      local P = require("src.profile").data
+      P.recipes = { tornado = true, bubblerocket = true, harpoon = true }
+      P.fusions = { ["pistol+flamer"] = true, ["sword+grenade"] = true, ["smg+sniper"] = true, ["hammer+boomerang"] = true }
+    end)
+    at(5, key("down")); at(6, key("down")); at(7, key("return")); snap(80, "cookbook1")
+    at(90, key("right")); snap(150, "cookbook2")
   else
     at(5, key("return"))                      -- menu -> lobby
     at(8, key("f10")); at(9, key("f10")); at(10, key("f10"))

@@ -22,12 +22,17 @@ Profile.ACHIEVEMENTS = {
   { id = "domatore", name = "Domatore di bot", desc = "Vinci una partita contro bot difficili", stat = "hard_wins", goal = 1, coins = 250 },
   { id = "elementi", name = "Sfida gli elementi", desc = "Resta in vita durante 25 eventi di mappa", stat = "events_survived", goal = 25, coins = 150 },
   { id = "intoccabile", name = "Intoccabile", desc = "Vinci un round senza subire danni", stat = "flawless", goal = 1, coins = 200 },
+  { id = "prima_fusione", name = "Scintilla", desc = "Fondi due armi", stat = "fusions_made", goal = 1, coins = 50 },
+  { id = "fabbro", name = "Fabbro", desc = "Scopri 25 fusioni normali diverse", stat = "fusion_kinds", goal = 25, coins = 150 },
+  { id = "cuoco", name = "Apprendista alchimista", desc = "Scopri 5 ricette speciali", stat = "recipes_found", goal = 5, coins = 150 },
+  { id = "alchimista", name = "Alchimista", desc = "Scopri tutte le ricette speciali", stat = "recipes_found", goal = 14, coins = 300 },
+  { id = "forgiato", name = "Forgiato in battaglia", desc = "Vinci un round con un'arma fusa in mano", stat = "fused_round_wins", goal = 1, coins = 100 },
 }
 Profile.by_id = {}
 for _, a in ipairs(Profile.ACHIEVEMENTS) do Profile.by_id[a.id] = a end
 
 -- monete guadagnate in partita
-Profile.REWARD = { match = 20, kill = 5, round = 3, win = 30 }
+Profile.REWARD = { match = 20, kill = 5, round = 3, win = 30, recipe = 30, fusion = 2 }
 
 local EXPLOSIVE = { grenade = true, bazooka = true, mines = true, swarm = true }
 
@@ -41,7 +46,8 @@ Profile.DEFAULT_SETTINGS = {
 local function fresh()
   local st = {}
   for k, v in pairs(Profile.DEFAULT_SETTINGS) do st[k] = v end
-  return { coins = 0, owned = {}, done = {}, stats = {}, fav = { hero = "gatto", skin = 1 }, settings = st }
+  return { coins = 0, owned = {}, done = {}, stats = {}, fav = { hero = "gatto", skin = 1 }, settings = st,
+           recipes = {}, fusions = {} }   -- ricette speciali scoperte, fusioni normali scoperte ("corpo+donatore")
 end
 
 local p = fresh()
@@ -168,9 +174,35 @@ local function earn(n)
   if Profile.match then Profile.match.coins = Profile.match.coins + n end
 end
 
+-- La fusione dell'evento e' una ricetta speciale mai scoperta da un giocatore umano?
+-- (chiamata da main prima degli effetti, per la "prima scoperta")
+function Profile.is_new_recipe(e, is_human)
+  return e.type == "fused" and e.recipe and e.id and is_human(e.id) and not p.recipes[e.recipe] or false
+end
+
 -- eventi della simulazione; is_human(id) dice se il giocatore e' una persona
 function Profile.event(e, is_human)
   local t = e.type
+  if t == "fused" and e.id and is_human(e.id) then
+    bump("fusions_made")
+    if e.recipe then
+      if not p.recipes[e.recipe] then
+        p.recipes[e.recipe] = true
+        earn(Profile.REWARD.recipe)
+        Profile.toast("Nuova ricetta: " .. (e.name or e.recipe) .. "  +" .. Profile.REWARD.recipe .. " monete", { 1, 0.82, 0.3 })
+        bump("recipes_found")
+        Profile.save()
+      end
+    elseif e.body and e.donor then
+      local key = e.body .. "+" .. e.donor
+      if not p.fusions[key] then
+        p.fusions[key] = true
+        earn(Profile.REWARD.fusion)
+        bump("fusion_kinds")
+      end
+    end
+    return
+  end
   if t == "death" then
     local k = e.killer
     if k and k ~= e.id and is_human(k) then
@@ -197,6 +229,7 @@ function Profile.event(e, is_human)
       if is_human(id) then
         earn(Profile.REWARD.round); bump("rounds_won")
         if Profile.match and not Profile.match.hurt[id] then bump("flawless") end
+        if e.fused and e.fused[id] then bump("fused_round_wins") end
       end
     end
   elseif t == "match_end" then

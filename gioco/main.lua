@@ -251,6 +251,11 @@ local function step()
   end
   game:update(inputs)
   for _, e in ipairs(game:drain_events()) do
+    if e.type == "fused" and Profile.is_new_recipe(e, is_human) then
+      -- prima scoperta di una ricetta speciale: rallentatore e nome a tutto schermo
+      e.first = true
+      slow_frames = math.max(slow_frames, 45)
+    end
     Fx.handle(e, game)
     Profile.event(e, is_human)
     rumble_event(e)

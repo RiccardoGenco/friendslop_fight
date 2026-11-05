@@ -15,6 +15,7 @@ function Fx.reset()
   Fx.freeze, Fx.kx, Fx.ky, Fx.flash, Fx.flashes, Fx.pl = 0, 0, 0, 0, {}, {}
   Fx.bolts, Fx.banner, Fx.columns, Fx.decals, Fx.muzzles = {}, nil, {}, {}, {}
   Fx.labels = {}
+  Fx.discovery = nil
 end
 
 -- scritta che sale e svanisce sopra un punto del mondo (la disegna render.lua)
@@ -386,6 +387,12 @@ function Fx.handle(e, game)
     Audio.play("pickup", 0.75, 0.9)
     Audio.play("clash", 1.4, 0.5)
     Fx.label(e.x, e.y - 30, (e.name or "") .. "!", e.recipe and { 1, 0.85, 0.35 } or { 1, 0.9, 0.7 })
+    if e.first then
+      Fx.discovery = { text = e.name or "", t = 2.4, max = 2.4 }
+      Fx.flash = math.max(Fx.flash or 0, 0.5)
+      Fx.add_shake(5)
+      Audio.play("round_start", 1.2, 0.9)
+    end
   elseif t == "telegraph" then
     Audio.play("telegraph", e.crate and 0.7 or 1)
   elseif t == "item_spawn" then
@@ -474,6 +481,10 @@ function Fx.update(dt)
     local r = Fx.rings[i]
     r.life = r.life - dt
     if r.life <= 0 then table.remove(Fx.rings, i) end
+  end
+  if Fx.discovery then
+    Fx.discovery.t = Fx.discovery.t - dt
+    if Fx.discovery.t <= 0 then Fx.discovery = nil end
   end
   if Fx.banner then
     Fx.banner.t = Fx.banner.t - dt

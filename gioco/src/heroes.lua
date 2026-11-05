@@ -52,6 +52,8 @@ Heroes.list = {
         N = "5a3a30", A = "e8e8f0", a = "b8b8c8", B = "d63a3a", b = "9a2424", C = "f0eef4", c = "b8b6c4" } },
       { name = "Ombra", unlock = "muro_maestro", pal = pal{ F = "2a2633", f = "17141d", L = "4a4458", W = "fff27a", E = "1a1500",
         N = "6a5a80", A = "7a3ad6", a = "4f2391", B = "b77aff", b = "7a3ad6", C = "3a2a5a", c = "251a3c" } },
+      { name = "Alchimista", unlock = "alchimista", pal = pal{ F = "f2c24a", f = "b8862a", L = "fff0c4", W = "ffffff", E = "7a1fd6",
+        N = "e86a7a", A = "3a1f6a", a = "24124a", B = "ffb02e", b = "c07010", C = "4a2a7a", c = "2c1850" } },
     },
   },
   {

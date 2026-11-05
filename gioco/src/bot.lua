@@ -54,6 +54,24 @@ function Bot.think(game, index, level)
   if not p or not p.alive or game.phase ~= "playing" then return inp end
   local r = love.math.random
   local target = nearest_enemy(game, p)
+
+  -- fusione: continua a tenere premuto finche' non finisce
+  if p.fusing then
+    inp.pickup_held = true
+    return inp
+  end
+  -- su un'arma a terra fondibile, almeno dello stesso livello, e nessuno troppo vicino: fonde
+  if p.weapon and target then
+    local it = game:item_near(p)
+    local Fusion = require("src.sim.fusion")
+    local far = abs(target.x - p.x) + abs(target.y - p.y) > 90
+    if it and far and Fusion.can_fuse(p.weapon, it.weapon)
+       and (it.weapon.tier or 1) >= (p.weapon.tier or 1) then
+      inp.pickup_held = true
+      inp.pickup_pressed = (p.grab_t or 0) == 0
+      return inp
+    end
+  end
   local goal_x, goal_y
 
   if not p.weapon then

@@ -1098,6 +1098,26 @@ local function draw_banner(game, time)
     Render.text(b.text, 0, -16, { 1, 0.75, 0.3, min(1, b.t * 2) }, "big", "center", W)
     lg.pop()
   end
+  -- prima scoperta di una ricetta speciale
+  if Fx.discovery then
+    local d = Fx.discovery
+    local el = d.max - d.t
+    local k = min(1, el * 5)
+    local a = min(1, d.t * 2)
+    lg.setColor(0, 0, 0, 0.45 * a)
+    lg.rectangle("fill", 0, H / 2 - 44, W, 88)
+    lg.setBlendMode("add")
+    lg.setColor(1, 0.8, 0.3, 0.25 * a)
+    lg.rectangle("fill", 0, H / 2 - 44, W, 2)
+    lg.rectangle("fill", 0, H / 2 + 42, W, 2)
+    lg.setBlendMode("alpha")
+    Render.text("NUOVA RICETTA!", W / 2, H / 2 - 36, { 1, 0.95, 0.8, a }, "mid", "center", W)
+    lg.push()
+    lg.translate(W / 2, H / 2 + 6)
+    lg.scale(1 + 0.5 * (1 - k))
+    Render.text(d.text, 0, -16, { 1, 0.82, 0.3, a }, "big", "center", W)
+    lg.pop()
+  end
   if game.phase == "playing" and (game.lava_on or game.round_frame >= R.sudden_death_warning) then
     local pulse = (sin(time * (game.lava_on and 3 or 8)) + 1) / 2
     local a = (game.lava_on and 0.10 or 0.18) * pulse

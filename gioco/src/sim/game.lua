@@ -150,7 +150,12 @@ function Game:check_round_end()
   self.winners = winners
   self.phase = "roundend"
   self.timer = R.end_delay
-  self:emit("round_end", 0, 0, { winners = winners })
+  local fused = {}
+  for _, id in ipairs(winners) do
+    local w = self.players[id].weapon
+    if w and w.fused then fused[id] = true end
+  end
+  self:emit("round_end", 0, 0, { winners = winners, fused = fused })
 end
 
 function Game:finish_round_end()
@@ -405,7 +410,8 @@ function Game:complete_fusion(p, it)
   local fused = Fusion.fuse(p.weapon, it.weapon)
   self:remove_item(it)
   p.weapon = fused
-  self:emit("fused", p.x, p.y - 12, { id = p.id, weapon = fused.id, recipe = fused.recipe,
+  self:emit("fused", p.x, p.y - 12, { id = p.id, weapon = fused.id, recipe = fused.fused.recipe,
+                                       body = fused.fused.body, donor = fused.fused.donor,
                                        name = Fusion.name(fused) })
 end
 

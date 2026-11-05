@@ -8,6 +8,8 @@ local Profile = require("src.profile")
 local Look = require("src.look")
 local Audio = require("src.audio")
 local data = require("src.sim.data")
+local Fusion = require("src.sim.fusion")
+local Recipes = require("src.sim.recipes")
 
 local lg = love.graphics
 local floor, sin, cos, min, max, abs = math.floor, math.sin, math.cos, math.min, math.max, math.abs
@@ -21,6 +23,7 @@ local Menu = {
 local ITEMS = {
   { id = "play", label = "GIOCA", sub = "2-6 giocatori, ultimo in piedi vince" },
   { id = "heroes", label = "PERSONAGGI", sub = "eroi, skin e negozio" },
+  { id = "recipes", label = "RICETTARIO", sub = "fusioni e ricette scoperte" },
   { id = "achievements", label = "OBIETTIVI", sub = "sfide e ricompense" },
   { id = "settings", label = "IMPOSTAZIONI", sub = "audio e video" },
   { id = "quit", label = "ESCI", sub = "a presto" },
@@ -191,6 +194,15 @@ function Menu.press(b)
     elseif b == "back" then sfx("ui_back"); Menu.open("main", -1) end
   elseif s == "settings" then
     settings_press(b)
+  elseif s == "recipes" then
+    -- due pagine: ricette speciali (lista) e griglia delle fusioni normali
+    if b == "left" or b == "right" then
+      Menu.page = (Menu.page or 1) == 1 and 2 or 1
+      Menu.scroll, Menu.scroll_f = 0, 0
+      sfx("ui_move")
+    elseif b == "up" and (Menu.page or 1) == 1 and Menu.scroll > 0 then Menu.scroll = Menu.scroll - 1; sfx("ui_move")
+    elseif b == "down" and (Menu.page or 1) == 1 and Menu.scroll < #Recipes - 6 then Menu.scroll = Menu.scroll + 1; sfx("ui_move")
+    elseif b == "back" or b == "ok" then sfx("ui_back"); Menu.open("main", -1) end
   elseif s == "achievements" then
     local maxs = max(0, #Profile.ACHIEVEMENTS - 6)
     if b == "up" and Menu.scroll > 0 then Menu.scroll = Menu.scroll - 1; sfx("ui_move")
@@ -224,7 +236,7 @@ function Menu.click(x, y, button)
 end
 
 function Menu.wheel(dy)
-  if Menu.screen == "achievements" then Menu.press(dy > 0 and "up" or "down")
+  if Menu.screen == "achievements" or Menu.screen == "recipes" then Menu.press(dy > 0 and "up" or "down")
   elseif Menu.screen == "heroes" then skin_step(dy > 0 and -1 or 1) end
 end
 
@@ -490,7 +502,7 @@ local function draw_main(time, W, H)
   end
   local it = ITEMS[Menu.sel]
   Render.text(it.sub, W / 2, 252, UI.dim, "small", "center", W)
-  Render.text("v0.11", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text("v0.12", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 
@@ -659,6 +671,121 @@ local function draw_achievements(time, W, H)
   footer("Su/giu o rotella: scorri    Esc/B: indietro", W, H)
 end
 
+-- icona di un'arma ridotta, centrata in (x, y)
+local function weapon_icon(id, x, y, scale, alpha)
+  local d = data.weapons[id]
+  lg.push()
+  lg.translate(x, y)
+  lg.scale(scale or 1)
+  Render.draw_weapon_shape(id, d and d.color or { 1, 1, 1 }, true, alpha)
+  lg.pop()
+end
+
+local function draw_recipes(time, W, H)
+  Render.text("RICETTARIO", W / 2, 6, UI.gold, "big", "center", W)
+  local found = Profile.data.recipes or {}
+  local fusions = Profile.data.fusions or {}
+  local page = Menu.page or 1
+  -- schede delle due pagine
+  local tabs = { "RICETTE SPECIALI", "FUSIONI NORMALI" }
+  for i, t in ipairs(tabs) do
+    local tx = W / 2 + (i == 1 and -86 or 86)
+    local on = page == i
+    local k = anim("rtab" .. i, on)
+    button(tx - 80, 38, 160, 16, t, on and 1 or 0.15 * k, on and UI.gold or UI.dim, "small")
+    hit(tx - 80, 38, 160, 16, nil, function() if page ~= i then Menu.press("right") end end)
+  end
+  if page == 1 then
+    local n = 0
+    for _, r in ipairs(Recipes) do if found[r.id] then n = n + 1 end end
+    Render.text(n .. " / " .. #Recipes .. " scoperte", W / 2, 58, UI.dim, "small", "center", W)
+    local x, w = 50, W - 100
+    lg.setScissor(0, 70 * Render.SS, Render.W * Render.SS, 254 * Render.SS)
+    for i, r in ipairs(Recipes) do
+      local y = 72 + (i - 1 - Menu.scroll_f) * 42
+      if y > 30 and y < 340 then
+        local ok = found[r.id]
+        local enter = min(1, max(0, Menu.trans * 3 - (i - Menu.scroll) * 0.25))
+        local ox = (1 - enter) * 30
+        panel(x + ox, y, w, 36, enter, ok and UI.gold_d or nil)
+        -- ingredienti: se la ricetta manca se ne vede uno solo, come indizio
+        weapon_icon(r.a, x + ox + 22, y + 18, 0.9, enter)
+        Render.text("+", x + ox + 44, y + 12, UI.dim, "mid", "center", 20)
+        if ok then weapon_icon(r.b, x + ox + 66, y + 18, 0.9, enter)
+        else Render.text("?", x + ox + 66, y + 10, UI.dim, "mid", "center", 20) end
+        Render.text(ok and r.name or "???", x + ox + 96, y + 4, ok and UI.gold or UI.text, "mid", "left", 300)
+        local hint = ok and r.hint or ("Indizio: contiene " .. data.weapons[r.a].name:lower())
+        Render.text(hint, x + ox + 96, y + 22, UI.dim, "small", "left", w - 110)
+        if ok then
+          lg.setColor(UI.green[1], UI.green[2], UI.green[3], enter)
+          Render.text("SCOPERTA", x + ox + w - 70, y + 6, UI.green, "small", "left", 70)
+        else
+          coin_icon(x + ox + w - 52, y + 10, 4, time)
+          Render.text("+" .. Profile.REWARD.recipe, x + ox + w - 44, y + 6, UI.gold, "small", "left", 60)
+        end
+      end
+    end
+    lg.setScissor()
+    local maxs = max(1, #Recipes - 6)
+    lg.setColor(1, 1, 1, 0.1); lg.rectangle("fill", W - 38, 74, 3, 246, 1, 1)
+    setc(UI.gold); lg.rectangle("fill", W - 38, 74 + 246 * (Menu.scroll_f / maxs) * (1 - 6 / #Recipes), 3, 246 * 6 / #Recipes, 1, 1)
+    footer("Sinistra/destra: pagina    Su/giu o rotella: scorri    Esc/B: indietro", W, H)
+  else
+    -- griglia corpo (righe) x donatore (colonne)
+    local list, ids = Fusion.all_pairs()
+    local n = 0
+    for _, pr in ipairs(list) do if fusions[pr.body .. "+" .. pr.donor] then n = n + 1 end end
+    Render.text(n .. " / " .. #list .. " fusioni normali scoperte   (oro: ricetta speciale)", W / 2, 58, UI.dim, "small", "center", W)
+    -- legenda: corpo a sinistra, donatore in alto
+    local cs = 10
+    local gx = floor(W / 2 - #ids * cs / 2) + 24
+    local gy = 96
+    Render.text("in mano  v", gx - 80, gy - 12, UI.dim, "small", "left", 70)
+    Render.text("raccolta  >", gx - 80, gy - 26, UI.dim, "small", "left", 70)
+    local hover
+    local hr, hc = -1, -1
+    if Menu.mx >= gx and Menu.my >= gy then
+      hc, hr = floor((Menu.mx - gx) / cs) + 1, floor((Menu.my - gy) / cs) + 1
+    end
+    -- armi raccolte in colonna (icone in verticale), armi in mano in riga
+    for c, id in ipairs(ids) do
+      lg.push(); lg.translate(gx + (c - 0.5) * cs, gy - 14); lg.rotate(-math.pi / 2)
+      local d = data.weapons[id]
+      lg.scale(0.55); Render.draw_weapon_shape(id, d.color, true, (c == hc) and 1 or 0.7); lg.pop()
+    end
+    for r, b in ipairs(ids) do
+      weapon_icon(b, gx - 14, gy + (r - 0.5) * cs, 0.55, (r == hr) and 1 or 0.7)
+      for c, d in ipairs(ids) do
+        local x, y = gx + (c - 1) * cs, gy + (r - 1) * cs
+        local recipe = Fusion.RECIPES[Fusion.recipe_key(b, d)]
+        local got = recipe and found[recipe.id] or fusions[b .. "+" .. d]
+        if recipe then
+          if got then lg.setColor(1, 0.82, 0.3, 0.95) else lg.setColor(0.5, 0.4, 0.15, 0.6) end
+        elseif got then
+          local dc = data.weapons[d].color
+          lg.setColor(dc[1], dc[2], dc[3], 0.9)
+        else
+          lg.setColor(0.16, 0.15, 0.26, 0.9)
+        end
+        lg.rectangle("fill", x + 1, y + 1, cs - 2, cs - 2, 2, 2)
+        if Menu.mx >= x and Menu.mx < x + cs and Menu.my >= y and Menu.my < y + cs then
+          hover = { b = b, d = d, got = got, recipe = recipe }
+          lg.setColor(1, 1, 1, 0.9); lg.rectangle("line", x + 0.5, y + 0.5, cs - 1, cs - 1, 2, 2)
+        end
+      end
+    end
+    -- nome della casella sotto il mouse
+    local label = "Passa col mouse su una casella"
+    if hover then
+      if hover.recipe then label = hover.got and hover.recipe.name or "??? (ricetta speciale)"
+      elseif hover.got then label = Fusion.name(Fusion.fuse({ id = hover.b }, { id = hover.d }))
+      else label = data.weapons[hover.b].name .. " + " .. data.weapons[hover.d].name .. ": da scoprire" end
+    end
+    Render.text(label, W / 2, gy + #ids * cs + 6, hover and UI.text or UI.dim, "small", "center", W)
+    footer("Sinistra/destra: pagina    Mouse: nome della fusione    Esc/B: indietro", W, H)
+  end
+end
+
 local function draw_settings(time, W, H)
   Render.text("IMPOSTAZIONI", W / 2, 6, UI.gold, "big", "center", W)
   local st = Profile.data.settings
@@ -735,6 +862,7 @@ function Menu.draw(time)
   if Menu.screen == "main" then draw_main(time, W, H)
   elseif Menu.screen == "heroes" then draw_heroes(time, W, H)
   elseif Menu.screen == "settings" then draw_settings(time, W, H)
+  elseif Menu.screen == "recipes" then draw_recipes(time, W, H)
   else draw_achievements(time, W, H) end
   lg.pop()
   if Menu.trans < 1 then
