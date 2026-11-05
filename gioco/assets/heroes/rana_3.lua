@@ -1,1 +1,1 @@
-return { fw = 67, fh = 72, ox = 33, frames = 6 }
+return { fw = 70, fh = 83, ox = 35, frames = 6 }
