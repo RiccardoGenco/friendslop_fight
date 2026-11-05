@@ -54,6 +54,7 @@ local SETTINGS = {
   { key = "pixel_perfect", label = "Scala pixel perfetta", kind = "toggle" },
   { key = "shake", label = "Scosse dello schermo", kind = "slider" },
   { key = "flash", label = "Lampi a schermo", kind = "slider" },
+  { key = "vibration", label = "Vibrazione controller", kind = "toggle" },
   { key = "reset", label = "Ripristina predefinite", kind = "action" },
 }
 local SEL_ROWS = {}
@@ -489,7 +490,7 @@ local function draw_main(time, W, H)
   end
   local it = ITEMS[Menu.sel]
   Render.text(it.sub, W / 2, 252, UI.dim, "small", "center", W)
-  Render.text("v0.7", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text("v0.8", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 
@@ -662,7 +663,7 @@ local function draw_settings(time, W, H)
   Render.text("IMPOSTAZIONI", W / 2, 6, UI.gold, "big", "center", W)
   local st = Profile.data.settings
   local x, w = 110, W - 220
-  panel(x - 10, 44, w + 20, 288 - 44)
+  panel(x - 10, 44, w + 20, 272)
   local y = 50
   for i, row in ipairs(SETTINGS) do
     if row.header then

@@ -20,4 +20,9 @@ Per ogni caratteristica: com'è adesso, cosa migliorare, cosa si fa. Ordine = or
 | 14 | Progressione | 10 obiettivi, monete, skin | Le novità non hanno obiettivi propri | Nuovi obiettivi: vincere contro bot difficili, sopravvivere agli eventi di mappa, eliminare con la lava |
 
 ## Stato
-Ogni punto viene chiuso con: modifica, test della simulazione, prova automatica con i bot.
+Tutti i 14 punti sono fatti (v0.8). Ogni punto e' stato chiuso con: modifica, test della simulazione
+(87 test, compresi quelli nuovi sugli eventi di mappa), partita automatica di 8 minuti con i bot che
+passa anche per menu, impostazioni e pausa, e partite tra bot ai tre livelli.
+
+Da verificare a mano (non provabile senza schermo): leggibilita' di HUD e fendenti alla distanza della
+telecamera, volume relativo di musica ed effetti, intensita' della vibrazione.

@@ -38,7 +38,15 @@ local function clear_line(world, x1, y1, x2, y2)
   return true
 end
 
-function Bot.think(game, index)
+-- livelli: errore di mira, voglia di attaccare, riflessi (parry, scatto), schivata dei proiettili
+Bot.LEVELS = {
+  { name = "Facile", aim = 0.7, fire = 0.03, melee = 0.03, parry = 0.03, dash = 0.004, dodge = 0 },
+  { name = "Normale", aim = 0.25, fire = 0.07, melee = 0.07, parry = 0.12, dash = 0.012, dodge = 0.15 },
+  { name = "Difficile", aim = 0.08, fire = 0.13, melee = 0.16, parry = 0.32, dash = 0.02, dodge = 0.6 },
+}
+
+function Bot.think(game, index, level)
+  local L = Bot.LEVELS[level or 2] or Bot.LEVELS[2]
   local p = game.players[index]
   local inp = { mx = 0, my = 0, jump_held = false, jump_pressed = false, attack_pressed = false,
                 dash_pressed = false, parry_pressed = false, pickup_pressed = false }
@@ -121,23 +129,33 @@ function Bot.think(game, index)
         local t = dist / pj.speed
         ey = ey - 0.5 * pj.gravity * t * t
       end
-      local ang = math.atan2(ey - sy, ex - sx) + (r() - 0.5) * 0.25
+      local ang = math.atan2(ey - sy, ex - sx) + (r() - 0.5) * L.aim
       inp.ax, inp.ay = math.cos(ang), math.sin(ang)
       if dist < (def.bot_range or 220) * 1.4 and clear_line(game.world, sx, sy, ex, ey) then
         if def.auto then
           inp.attack_held = r() < 0.7
-        elseif r() < 0.07 then
+        elseif r() < L.fire then
           inp.attack_pressed = true
         end
       end
-    elseif close and r() < 0.07 then
+    elseif close and r() < L.melee then
       inp.attack_pressed = true
     end
     local ta = target.action
-    if ta and ta.type == "attack" and abs(tdx) < 50 and abs(tdy) < 24 and r() < 0.12 then
+    if ta and ta.type == "attack" and abs(tdx) < 50 and abs(tdy) < 24 and r() < L.parry then
       inp.parry_pressed = true
     end
-    if close and r() < 0.012 then inp.dash_pressed = true end
+    if close and r() < L.dash then inp.dash_pressed = true end
+  end
+  -- schivata: un proiettile nemico in arrivo vicino fa saltare o scattare
+  if L.dodge > 0 then
+    for _, pr in ipairs(game.projectiles) do
+      local dx, dy = p.x - pr.x, (p.y - 10) - pr.y
+      if pr.owner ~= p.id and abs(dx) < 80 and abs(dy) < 24 and pr.vx * dx > 0 and r() < L.dodge * 0.2 then
+        if p.grounded then inp.jump_pressed, inp.jump_held = true, true else inp.dash_pressed = true end
+        break
+      end
+    end
   end
   if p.weapon and r() < 0.002 then inp.pickup_pressed = true end
   return inp

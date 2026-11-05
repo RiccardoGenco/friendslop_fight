@@ -78,50 +78,75 @@ function Audio.notes(freqs, each, wave, vol)
   return love.audio.newSource(sd, "static")
 end
 
--- musica dei menu: giro di quattro accordi (La- Fa Do Sol) con basso e arpeggio, in loop
-function Audio.load_music()
-  local bpm = 112
+-- Musica generata dal codice. Un brano e' un giro di accordi suonato con basso a triangolo,
+-- arpeggio a impulso stretto, charleston di rumore ed eventuale cassa.
+local function make_track(chords, bpm, opts)
   local eighth = 60 / bpm / 2
-  local chords = { { 220, 261.6, 329.6 }, { 174.6, 220, 261.6 }, { 130.8, 164.8, 196 }, { 196, 246.9, 293.7 } }
   local per = math.floor(RATE * eighth)
-  local n = per * 8 * #chords * 2
+  local reps = opts.reps or 2
+  local n = per * 8 * #chords * reps
   local sd = love.sound.newSoundData(n, RATE, 16, 1)
   local i = 0
-  for rep = 1, 2 do
-    for c, ch in ipairs(chords) do
+  for rep = 1, reps do
+    for _, ch in ipairs(chords) do
       for step = 0, 7 do
         local arp = ch[(step % 3) + 1] * ((step >= 4) and 2 or 1) * ((rep == 2 and step % 2 == 1) and 2 or 1)
         local bass = ch[1] / 2
+        local bass_on = opts.drive or step % 2 == 0
         for j = 0, per - 1 do
           local t = j / per
           local tt = i / RATE
-          local a = ((tt * arp) % 1 < 0.25) and 1 or -1                      -- impulso stretto, suono chiptune
-          local b = 1 - 4 * math.abs(((tt * bass) % 1) - 0.5)                 -- triangolo
-          local v = a * 0.05 * (1 - t) ^ 1.5 + b * 0.10 * ((step % 2 == 0) and (1 - 0.5 * t) or 0.6)
-          if step % 4 == 2 then v = v + (love.math.random() * 2 - 1) * 0.04 * (1 - t) ^ 6 end   -- charleston
-          sd:setSample(i, v)
+          local a = ((tt * arp) % 1 < (opts.duty or 0.25)) and 1 or -1
+          local b = 1 - 4 * math.abs(((tt * bass) % 1) - 0.5)
+          local v = a * (opts.lead or 0.05) * (1 - t) ^ 1.5 + b * 0.10 * (bass_on and (1 - 0.5 * t) or 0.6)
+          if step % 4 == 2 or (opts.drive and step % 2 == 1) then
+            v = v + (love.math.random() * 2 - 1) * 0.04 * (1 - t) ^ 6
+          end
+          if opts.kick and step % 4 == 0 then
+            -- cassa: sinusoide che scende di frequenza
+            local kf = 120 * (1 - t) ^ 3 + 40
+            v = v + math.sin(2 * math.pi * kf * j / RATE) * 0.22 * (1 - t) ^ 4
+          end
+          sd:setSample(i, math.max(-1, math.min(1, v)))
           i = i + 1
         end
       end
     end
   end
-  Audio.music = love.audio.newSource(sd, "static")
-  Audio.music:setLooping(true)
-  Audio.music:setVolume(0)
-  Audio.music_vol = 0
+  local src = love.audio.newSource(sd, "static")
+  src:setLooping(true)
+  src:setVolume(0)
+  return src
 end
 
--- da chiamare ogni frame: la musica sale nei menu e sfuma in partita
-function Audio.update_music(dt, on)
-  local m = Audio.music
-  if not m or not Audio.enabled then return end
-  local target = on and Audio.music_mul or 0
-  Audio.music_vol = Audio.music_vol + (target - Audio.music_vol) * math.min(1, dt * 2)
-  if Audio.music_vol > 0.01 then
-    if not m:isPlaying() then m:play() end
-    m:setVolume(Audio.music_vol)
-  elseif m:isPlaying() then
-    m:pause()
+function Audio.load_music()
+  -- menu: La- Fa Do Sol, tranquillo
+  Audio.tracks = {
+    menu = make_track({ { 220, 261.6, 329.6 }, { 174.6, 220, 261.6 }, { 130.8, 164.8, 196 }, { 196, 246.9, 293.7 } },
+      112, {}),
+    -- battaglia: Mi- Do Re Si (tensione), piu' veloce, con cassa e basso continuo
+    battle = make_track({ { 164.8, 196, 246.9 }, { 130.8, 164.8, 196 }, { 146.8, 185, 220 }, { 123.5, 155.6, 185 } },
+      144, { kick = true, drive = true, lead = 0.035, duty = 0.125 }),
+  }
+  Audio.track_vol = { menu = 0, battle = 0 }
+  Audio.music = Audio.tracks.menu
+end
+
+-- da chiamare ogni frame: mode "menu", "battle" o nil (silenzio). fast: morte improvvisa.
+function Audio.update_music(dt, mode, fast, paused)
+  if not Audio.tracks or not Audio.enabled then return end
+  for name, src in pairs(Audio.tracks) do
+    local target = 0
+    if name == mode then target = Audio.music_mul * (name == "battle" and (paused and 0.25 or 0.6) or 1) end
+    local v = Audio.track_vol[name] + (target - Audio.track_vol[name]) * math.min(1, dt * 2)
+    Audio.track_vol[name] = v
+    if v > 0.01 then
+      if not src:isPlaying() then src:play() end
+      src:setVolume(v)
+      if name == "battle" then src:setPitch(fast and 1.12 or 1) end
+    elseif src:isPlaying() then
+      src:pause()
+    end
   end
 end
 

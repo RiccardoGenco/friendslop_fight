@@ -19,6 +19,9 @@ Profile.ACHIEVEMENTS = {
   { id = "mitico", name = "Leggenda", desc = "Elimina qualcuno con un'arma mitica", stat = "mythic_kills", goal = 1, coins = 150 },
   { id = "demolitore", name = "Demolitore", desc = "Elimina 15 avversari con le esplosioni", stat = "explosive_kills", goal = 15, coins = 150 },
   { id = "collezionista", name = "Collezionista", desc = "Raccogli 100 armi", stat = "pickups", goal = 100, coins = 150 },
+  { id = "domatore", name = "Domatore di bot", desc = "Vinci una partita contro bot difficili", stat = "hard_wins", goal = 1, coins = 250 },
+  { id = "elementi", name = "Sfida gli elementi", desc = "Resta in vita durante 25 eventi di mappa", stat = "events_survived", goal = 25, coins = 150 },
+  { id = "intoccabile", name = "Intoccabile", desc = "Vinci un round senza subire danni", stat = "flawless", goal = 1, coins = 200 },
 }
 Profile.by_id = {}
 for _, a in ipairs(Profile.ACHIEVEMENTS) do Profile.by_id[a.id] = a end
@@ -32,6 +35,7 @@ Profile.DEFAULT_SETTINGS = {
   master = 0.8, music = 0.6, sfx = 0.8,                  -- volumi 0..1
   fullscreen = false, vsync = true, pixel_perfect = true, -- video
   shake = 1, flash = 1,                                  -- intensita' di scosse e lampi 0..1
+  vibration = true, bot_level = 2,                       -- vibrazione controller, livello bot 1-3
 }
 
 local function fresh()
@@ -154,8 +158,9 @@ end
 
 function Profile.progress(a) return math.min(a.goal, p.stats[a.stat] or 0) end
 
-function Profile.start_match()
-  Profile.match = { coins = 0, unlocked = {} }
+-- hard: la partita ha almeno un bot ed e' a livello difficile
+function Profile.start_match(hard)
+  Profile.match = { coins = 0, unlocked = {}, hard = hard, hurt = {} }
 end
 
 local function earn(n)
@@ -181,17 +186,41 @@ function Profile.event(e, is_human)
     bump("perfect_parries")
   elseif t == "pickup" and e.id and is_human(e.id) then
     bump("pickups")
+  elseif t == "hit" and e.id and Profile.match then
+    Profile.match.hurt[e.id] = true
+  elseif t == "round_start" and Profile.match then
+    Profile.match.hurt = {}
+  elseif t == "map_event" and Profile.match then
+    Profile.match.pending_event = true
   elseif t == "round_end" then
     for _, id in ipairs(e.winners or {}) do
-      if is_human(id) then earn(Profile.REWARD.round); bump("rounds_won") end
+      if is_human(id) then
+        earn(Profile.REWARD.round); bump("rounds_won")
+        if Profile.match and not Profile.match.hurt[id] then bump("flawless") end
+      end
     end
   elseif t == "match_end" then
     earn(Profile.REWARD.match)
     bump("matches")
     for _, id in ipairs(e.winners or {}) do
-      if is_human(id) then earn(Profile.REWARD.win); bump("wins"); break end
+      if is_human(id) then
+        earn(Profile.REWARD.win); bump("wins")
+        if Profile.match and Profile.match.hard then bump("hard_wins") end
+        break
+      end
     end
     Profile.save()
+  end
+end
+
+-- chiamata da main dopo ogni passo: un evento di mappa conta quando i suoi colpi sono finiti
+function Profile.after_step(game, is_human)
+  local m = Profile.match
+  if not (m and m.pending_event) then return end
+  if game.hazards and #game.hazards > 0 then return end
+  m.pending_event = false
+  for _, p in ipairs(game.players) do
+    if p.alive and is_human(p.id) then bump("events_survived") end
   end
 end
 

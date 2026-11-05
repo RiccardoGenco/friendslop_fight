@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.7)
+# Friendslop Fight (prototipo v0.8)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -14,12 +14,15 @@ Ritmo e bilanciamento con partite tra bot: `luajit tests/balance.lua [partite] [
 All'avvio: Gioca, Personaggi, Obiettivi, Esci. Frecce/WASD o croce/levetta per muoversi, Invio/A per scegliere, Esc/B per tornare. Funziona anche col mouse (click, tasto destro per tornare, rotella per scorrere).
 - **Personaggi**: sei animali guerrieri (gatto ninja, rana samurai, orso pirata, volpe cowboy, coniglio vichingo, procione ladro), tre skin ciascuno. Si comprano con le monete; le skin leggendarie si sbloccano con gli obiettivi. Invio/A su uno sbloccato lo imposta come preferito.
 - **Obiettivi**: progressi e ricompense.
-- **Impostazioni**: volume generale, musica ed effetti; schermo intero, vsync, scala pixel perfetta, intensità di scosse e lampi. Si salvano nel profilo (anche F11).
+- **Impostazioni**: volume generale, musica ed effetti; schermo intero, vsync, scala pixel perfetta, intensità di scosse e lampi, vibrazione del controller. Si salvano nel profilo (anche F11).
 - **Monete**: a fine partita, solo per i giocatori umani (partita giocata, eliminazioni, round e partite vinte).
 Il profilo si salva nella cartella dati di LÖVE (`profilo.lua`).
 
+## Eventi di mappa
+Ogni 12-18 secondi la mappa colpisce: frana di massi nell'Arena, barili esplosivi in Fabbrica, fulmini sui Tetti. Ogni colpo è annunciato da una colonna tratteggiata e da un bersaglio a terra.
+
 ## Lobby
-Ogni giocatore sceglie l'eroe con sinistra/destra e la skin con su/giu (tastiera 1: A D W S, tastiera 2: frecce). I bot prendono un eroe a caso. Esc torna al menu.
+Ogni giocatore sceglie l'eroe con sinistra/destra e la skin con su/giu (tastiera 1: A D W S, tastiera 2: frecce). I bot prendono un eroe a caso. Tab (o Select sul controller) cambia il livello dei bot: Facile, Normale, Difficile. Esc torna al menu.
 Premi un tasto qualsiasi del controller per entrare, B per uscire, Start o Invio per iniziare. F1/F2 aggiungono la tastiera 1/2, F10 aggiunge un bot, F11 schermo intero. Da soli si parte contro due bot.
 
 ## Comandi

@@ -66,6 +66,32 @@ local function new_seed()
 end
 
 local ensure_loadouts
+
+-- vibrazione del controller del giocatore id (se e' un controller e l'opzione e' attiva)
+local function rumble(id, strength, dur)
+  if not Profile.data.settings.vibration then return end
+  local s = Input.slots[id]
+  if s and s.kind == "pad" and s.joy and s.joy.setVibration then
+    pcall(s.joy.setVibration, s.joy, strength, strength, dur)
+  end
+end
+
+local function rumble_event(e)
+  local t = e.type
+  if t == "hit" and not e.light then
+    rumble(e.id, math.min(1, 0.3 + (e.dmg or 10) / 60), 0.12)
+  elseif t == "death" then
+    rumble(e.id, 1, 0.4)
+    if e.killer and e.killer ~= e.id then rumble(e.killer, 0.45, 0.12) end
+  elseif t == "perfect_parry" or t == "parry" then
+    rumble(e.id, t == "perfect_parry" and 0.6 or 0.35, 0.1)
+  elseif t == "explosion" or t == "lightning" then
+    for _, p in ipairs(game.players) do
+      local dx, dy = p.x - e.x, p.y - e.y
+      if p.alive and dx * dx + dy * dy < 120 * 120 then rumble(p.id, 0.6, 0.2) end
+    end
+  end
+end
 local menu_press_result
 local pause_press
 
@@ -79,7 +105,9 @@ local function start_game()
   game = Game.new({ players = Input.count(), seed = new_seed() })
   Look.loadout = {}
   for i, s in ipairs(Input.slots) do Look.loadout[i] = { hero = s.hero, skin = s.skin } end
-  Profile.start_match()
+  local has_bot = false
+  for _, sl in ipairs(Input.slots) do if sl.kind == "bot" then has_bot = true end end
+  Profile.start_match(has_bot and Profile.data.settings.bot_level == 3)
   match_stats = {}
   for i = 1, Input.count() do match_stats[i] = { kills = 0, deaths = 0 } end
   Fx.reset()
@@ -200,7 +228,7 @@ local function step()
   local inputs = {}
   for i, s in ipairs(Input.slots) do
     if s.kind == "bot" then
-      inputs[i] = Bot.think(game, i)
+      inputs[i] = Bot.think(game, i, Profile.data.settings.bot_level)
     else
       inputs[i] = Input.consume(s)
       -- tastiera 1: mira col mouse (se il mouse e' stato usato)
@@ -221,6 +249,7 @@ local function step()
   for _, e in ipairs(game:drain_events()) do
     Fx.handle(e, game)
     Profile.event(e, is_human)
+    rumble_event(e)
     if e.type == "death" then
       local v = match_stats[e.id]
       if v then v.deaths = v.deaths + 1 end
@@ -230,6 +259,7 @@ local function step()
     if e.type == "round_end" then slow_frames = 80 end
   end
   Fx.track(game)
+  Profile.after_step(game, is_human)
   if slow_frames > 0 then slow_frames = slow_frames - 1 end
   if game.phase == "matchend" then state = "matchend" end
 end
@@ -243,7 +273,9 @@ function love.update(dt)
   Debug.update(dt)
   Profile.update(dt)
   Menu.update(dt)
-  Audio.update_music(dt, state == "menu" or state == "lobby" or state == "matchend")
+  local mode = (state == "menu" or state == "lobby" or state == "matchend") and "menu"
+    or ((state == "game" or state == "pause") and "battle") or nil
+  Audio.update_music(dt, mode, game and game.lava_on, state == "pause")
   poll_menu_sticks()
 
   if state == "menu" then
@@ -324,7 +356,10 @@ local function draw_lobby()
   local msg = (n >= 2 and "START (o Invio) per iniziare")
     or (n == 1 and "START (o Invio): parti da solo contro 2 bot")
     or "Invio: tastiera + 2 bot   oppure premi un tasto del controller"
-  Render.text(msg, W / 2, 280, { 0.5, 1, 0.5 }, "mid", "center", W)
+  Render.text(msg, W / 2, 282, { 0.5, 1, 0.5 }, "mid", "center", W)
+  local lv = Bot.LEVELS[Profile.data.settings.bot_level] or Bot.LEVELS[2]
+  local lc = ({ { 0.5, 1, 0.6 }, { 1, 0.85, 0.3 }, { 1, 0.45, 0.4 } })[Profile.data.settings.bot_level] or { 1, 1, 1 }
+  Render.text("Bot: " .. lv.name .. "   (Tab o Select per cambiare)", W / 2, 268, lc, "small", "center", W)
   Render.text("F1/F2 tastiera   F10 bot   Backspace togli   Esc menu   Tastiera 1: A D W S   Tastiera 2: frecce",
     W / 2, 304, { 0.6, 0.7, 0.9 }, "small", "center", W)
   Render.text("In gioco: F3 hitbox  F4 slow  F5 pausa  F6 frame  F7 ricarica dati  F8 taratura",
@@ -561,6 +596,13 @@ function love.gamepadpressed(joy, button)
   elseif state == "pause" then
     if button ~= "start" then pause_press(b) end
   elseif state == "lobby" then
+    if button == "back" then
+      local st = Profile.data.settings
+      st.bot_level = st.bot_level % 3 + 1
+      Audio.play("ui_move", 0.8 + 0.2 * st.bot_level, 0.7)
+      Profile.save()
+      return
+    end
     for _, s in ipairs(Input.slots) do
       if s.joy == joy and s.join_t ~= time then lobby_slot_press(s, b) end
     end
@@ -609,6 +651,12 @@ function love.keypressed(key)
     for _, sl in ipairs(Input.slots) do
       if sl.kb == 1 and kb1[key] then lobby_slot_press(sl, kb1[key]) end
       if sl.kb == 2 and kb2[key] then lobby_slot_press(sl, kb2[key]) end
+    end
+    if key == "tab" then
+      local st = Profile.data.settings
+      st.bot_level = st.bot_level % 3 + 1
+      Audio.play("ui_move", 0.8 + 0.2 * st.bot_level, 0.7)
+      Profile.save()
     end
     if key == "f1" or key == "f2" or key == "f10" then Audio.play("ui_join", 1, 0.7) end
     if key == "f1" then Input.add_keyboard(1)
