@@ -22,6 +22,9 @@ local lg = love.graphics
 local STEP = data.dt
 local state = "menu"         -- menu | lobby | game | pause | matchend
 local pause_reason = nil
+local pause_sel = 1
+local match_stats = {}       -- per giocatore: eliminazioni e morti della partita
+local PAUSE_ITEMS = { "Riprendi", "Volume", "Torna alla lobby", "Menu principale" }
 local game
 local canvas
 local acc, time = 0, 0
@@ -64,6 +67,7 @@ end
 
 local ensure_loadouts
 local menu_press_result
+local pause_press
 
 local function is_human(id)
   local s = Input.slots[id]
@@ -76,6 +80,8 @@ local function start_game()
   Look.loadout = {}
   for i, s in ipairs(Input.slots) do Look.loadout[i] = { hero = s.hero, skin = s.skin } end
   Profile.start_match()
+  match_stats = {}
+  for i = 1, Input.count() do match_stats[i] = { kills = 0, deaths = 0 } end
   Fx.reset()
   Input.clear_pending()
   acc, slow_frames = 0, 0
@@ -215,6 +221,12 @@ local function step()
   for _, e in ipairs(game:drain_events()) do
     Fx.handle(e, game)
     Profile.event(e, is_human)
+    if e.type == "death" then
+      local v = match_stats[e.id]
+      if v then v.deaths = v.deaths + 1 end
+      local k = e.killer and e.killer ~= e.id and match_stats[e.killer]
+      if k then k.kills = k.kills + 1 end
+    end
     if e.type == "round_end" then slow_frames = 80 end
   end
   Fx.track(game)
@@ -241,7 +253,8 @@ function love.update(dt)
     if Input.start_pressed() and Input.count() >= 1 then fill_and_start() end
   elseif state == "game" then
     if Input.start_pressed() then
-      state, pause_reason = "pause", "pausa"
+      state, pause_reason, pause_sel = "pause", "pausa", 1
+      Audio.play("ui_ok", 1, 0.7)
     elseif Input.any_disconnected() then
       state, pause_reason = "pause", "disconnesso"
     elseif Debug.paused then
@@ -321,38 +334,103 @@ end
 
 local function draw_overlay_pause()
   local W, H = Render.W, Render.H
-  lg.setColor(0, 0, 0, 0.6)
+  lg.setColor(0.03, 0.02, 0.08, 0.7)
   lg.rectangle("fill", 0, 0, W, H)
   if pause_reason == "disconnesso" then
     local i, s = Input.any_disconnected()
     Render.text("CONTROLLER SCOLLEGATO", W / 2, H / 2 - 30, { 1, 0.5, 0.4 }, "mid", "center", W)
     Render.text((s and s.name or "") .. " (giocatore " .. tostring(i) .. ")", W / 2, H / 2 - 6, { 1, 1, 1 }, "small", "center", W)
     Render.text("Ricollegalo per continuare", W / 2, H / 2 + 10, { 0.8, 0.8, 0.9 }, "small", "center", W)
-  else
-    Render.text("PAUSA", W / 2, H / 2 - 30, { 1, 0.9, 0.3 }, "big", "center", W)
-    Render.text("START o Esc per riprendere   -   Q torna alla lobby", W / 2, H / 2 + 10, { 0.8, 0.8, 0.9 }, "small", "center", W)
+    return
   end
+  local pw, ph = 240, 170
+  local px, py = W / 2 - pw / 2, H / 2 - ph / 2
+  lg.setColor(0, 0, 0, 0.4); lg.rectangle("fill", px + 3, py + 4, pw, ph, 8, 8)
+  lg.setColor(0.11, 0.10, 0.20, 0.96); lg.rectangle("fill", px, py, pw, ph, 8, 8)
+  lg.setColor(1, 0.82, 0.28, 0.6); lg.rectangle("line", px + 0.5, py + 0.5, pw - 1, ph - 1, 8, 8)
+  Render.text("PAUSA", W / 2, py + 8, { 1, 0.85, 0.3 }, "big", "center", pw)
+  for i, label in ipairs(PAUSE_ITEMS) do
+    local y = py + 50 + (i - 1) * 28
+    local on = i == pause_sel
+    if on then
+      lg.setColor(1, 0.82, 0.28, 0.9); lg.rectangle("fill", px + 16, y - 3, pw - 32, 22, 5, 5)
+    else
+      lg.setColor(1, 1, 1, 0.06); lg.rectangle("fill", px + 16, y - 3, pw - 32, 22, 5, 5)
+    end
+    local tc = on and { 0.06, 0.05, 0.12 } or { 0.92, 0.93, 1 }
+    if label == "Volume" then
+      local v = Profile.data.settings.master
+      Render.text("Volume", px + 26, y + 1, tc, "mid", "left", 100)
+      lg.setColor(tc[1], tc[2], tc[3], 0.35); lg.rectangle("fill", px + 116, y + 6, 80, 5, 2, 2)
+      lg.setColor(tc[1], tc[2], tc[3]); lg.rectangle("fill", px + 116, y + 6, 80 * v, 5, 2, 2)
+      Render.text(math.floor(v * 100 + 0.5) .. "%", px + 200, y + 3, tc, "small", "left", 40)
+    else
+      Render.text(label, W / 2, y + 1, tc, "mid", "center", pw)
+    end
+  end
+  Render.text("Su/giu scegli   sinistra/destra volume   Invio/A conferma   Esc/B riprendi",
+    W / 2, py + ph + 10, { 0.6, 0.62, 0.8 }, "small", "center", W)
 end
 
+-- podio di fine partita: eroi in ordine di punteggio, statistiche, monete
 local function draw_overlay_matchend()
   local W, H = Render.W, Render.H
-  lg.setColor(0, 0, 0, 0.55)
+  lg.setColor(0.03, 0.02, 0.08, 0.78)
   lg.rectangle("fill", 0, 0, W, H)
-  local names = {}
-  for _, id in ipairs(game.match_winners or {}) do names[#names + 1] = data.color_names[id] end
-  local c = game.match_winners and data.colors[game.match_winners[1]] or { 1, 1, 1 }
-  Render.text("VINCE " .. string.upper(table.concat(names, " e ")) .. "!", W / 2, 90, c, "big", "center", W)
-  for i = 1, #game.players do
-    Render.text(data.color_names[i] .. ": " .. game.scores[i], W / 2, 140 + (i - 1) * 16, data.colors[i], "mid", "center", W)
+  local order = {}
+  for i = 1, #game.players do order[#order + 1] = i end
+  table.sort(order, function(a, b)
+    if game.scores[a] ~= game.scores[b] then return game.scores[a] > game.scores[b] end
+    local ka, kb = match_stats[a] and match_stats[a].kills or 0, match_stats[b] and match_stats[b].kills or 0
+    if ka ~= kb then return ka > kb end
+    return a < b
+  end)
+  local wid = order[1]
+  local wc = data.colors[wid]
+  local lo = Look.loadout[wid] or { hero = "gatto", skin = 1 }
+  Render.text("VINCE " .. string.upper(Heroes.get(lo.hero).name) .. "!", W / 2, 10, wc, "big", "center", W)
+  -- coriandoli
+  for i = 1, 70 do
+    local cx = (i * 73.1 + math.sin(time + i) * 20) % W
+    local cy = (i * 41.7 + time * (40 + (i % 7) * 12)) % H
+    local c = data.colors[(i % 6) + 1]
+    lg.setColor(c[1], c[2], c[3], 0.8)
+    lg.push(); lg.translate(cx, cy); lg.rotate(time * 3 + i); lg.rectangle("fill", -2, -1, 4, 2); lg.pop()
+  end
+  -- podio: secondo a sinistra, primo al centro, terzo a destra
+  local slots = { { x = W / 2, h = 70 }, { x = W / 2 - 110, h = 46 }, { x = W / 2 + 110, h = 30 } }
+  local base = 250
+  for place = 1, math.min(3, #order) do
+    local id = order[place]
+    local sl = slots[place]
+    local c = data.colors[id]
+    local l2 = Look.loadout[id] or { hero = "gatto", skin = 1 }
+    lg.setColor(0.13, 0.12, 0.22); lg.rectangle("fill", sl.x - 46, base - sl.h, 92, sl.h, 4, 4)
+    lg.setColor(c[1], c[2], c[3]); lg.rectangle("fill", sl.x - 46, base - sl.h, 92, 4, 2, 2)
+    Render.text(tostring(place), sl.x, base - sl.h + 10, { 1, 0.85, 0.3 }, "big", "center", 92)
+    local jump = place == 1 and math.abs(math.sin(time * 4)) * 10 or 0
+    Menu.draw_hero(l2.hero, l2.skin, sl.x, base - sl.h - jump, 3, c, time, place == 1 and (jump > 2 and "jump" or false) or false, 1, id)
+    local st = match_stats[id] or { kills = 0, deaths = 0 }
+    Render.text(game.scores[id] .. " round   " .. st.kills .. " elim.", sl.x, base + 4, c, "small", "center", 120)
+  end
+  -- gli altri in riga
+  for place = 4, #order do
+    local id = order[place]
+    local st = match_stats[id] or { kills = 0, deaths = 0 }
+    local l2 = Look.loadout[id] or { hero = "gatto", skin = 1 }
+    local x = W / 2 + (place - 5) * 150
+    Heroes.draw_head(l2.hero, l2.skin, x - 60, 270, 1)
+    Render.text(place .. ". " .. Heroes.get(l2.hero).name .. "  " .. game.scores[id] .. " round " .. st.kills .. " elim.",
+      x - 40, 272, data.colors[id], "small", "left", 140)
   end
   local m = Profile.match
   if m then
-    Render.text("+" .. m.coins .. " monete   (totale " .. Profile.data.coins .. ")", W / 2, 236, { 1, 0.85, 0.3 }, "mid", "center", W)
+    Render.text("+" .. m.coins .. " monete   (totale " .. Profile.data.coins .. ")", W / 2, 292, { 1, 0.85, 0.3 }, "mid", "center", W)
     if #m.unlocked > 0 then
-      Render.text("Obiettivi: " .. table.concat(m.unlocked, ", "), W / 2, 258, { 0.5, 1, 0.6 }, "small", "center", W)
+      Render.text("Obiettivi: " .. table.concat(m.unlocked, ", "), W / 2, 312, { 0.5, 1, 0.6 }, "small", "center", W)
     end
   end
-  Render.text("A / Invio: rivincita      B / Esc: lobby", W / 2, 285, { 0.9, 0.9, 1 }, "small", "center", W)
+  Render.text("A / Invio: rivincita      B / Esc: lobby", W / 2, 334, { 0.9, 0.9, 1 }, "small", "center", W)
 end
 
 -- mirino del mouse (tastiera 1)
@@ -449,6 +527,29 @@ function love.joystickremoved(joy)
   Input.joystick_removed(joy)
 end
 
+function pause_press(b)
+  if pause_reason == "disconnesso" then return end
+  if b == "up" or b == "down" then
+    pause_sel = (pause_sel - 1 + (b == "up" and -1 or 1)) % #PAUSE_ITEMS + 1
+    Audio.play("ui_move", 1, 0.7)
+  elseif (b == "left" or b == "right") and PAUSE_ITEMS[pause_sel] == "Volume" then
+    local st = Profile.data.settings
+    st.master = math.floor(math.max(0, math.min(1, st.master + (b == "left" and -0.1 or 0.1))) * 10 + 0.5) / 10
+    Menu.apply_settings()
+    Audio.play("ui_move", 0.8 + 0.4 * st.master, 0.7)
+  elseif b == "back" or (b == "ok" and pause_sel == 1) then
+    Profile.save()
+    state = "game"
+    Input.clear_pending()
+    Audio.play("ui_back", 1, 0.7)
+  elseif b == "ok" then
+    local it = PAUSE_ITEMS[pause_sel]
+    Profile.save()
+    if it == "Torna alla lobby" then to_lobby(); Audio.play("ui_back", 1, 0.7)
+    elseif it == "Menu principale" then to_lobby(); to_menu() end
+  end
+end
+
 local GAMEPAD_MENU = { dpup = "up", dpdown = "down", dpleft = "left", dpright = "right",
                        a = "ok", start = "ok", b = "back", back = "back" }
 
@@ -457,6 +558,8 @@ function love.gamepadpressed(joy, button)
   if not b then return end
   if state == "menu" then
     menu_press(b)
+  elseif state == "pause" then
+    if button ~= "start" then pause_press(b) end
   elseif state == "lobby" then
     for _, s in ipairs(Input.slots) do
       if s.joy == joy and s.join_t ~= time then lobby_slot_press(s, b) end
@@ -516,12 +619,12 @@ function love.keypressed(key)
       if Input.count() >= 2 then start_game() else fill_and_start() end
     elseif key == "escape" then to_menu() end
   elseif state == "game" then
-    if key == "escape" then state, pause_reason = "pause", "pausa" end
+    if key == "escape" then state, pause_reason, pause_sel = "pause", "pausa", 1; Audio.play("ui_ok", 1, 0.7) end
   elseif state == "pause" then
-    if key == "escape" and not Input.any_disconnected() then
-      state = "game"
-      Input.clear_pending()
-    elseif key == "q" then to_lobby() end
+    local map = { up = "up", w = "up", down = "down", s = "down", left = "left", a = "left",
+                  right = "right", d = "right", ["return"] = "ok", space = "ok", escape = "back" }
+    if key == "q" then to_lobby()
+    elseif map[key] then pause_press(map[key]) end
   elseif state == "matchend" then
     if key == "return" then start_game()
     elseif key == "escape" then to_lobby() end

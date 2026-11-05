@@ -122,6 +122,11 @@ for i = 1, 60 * 60 * 8 do
     love.mousemoved(300 + (i % 700), 200 + (i % 300))
     love.mousepressed(300, 300, 1 + (i % 2))
   end
+  if i == 500 then
+    key("escape"); love.update(1 / 60); love.draw()
+    for _, k in ipairs({ "down", "right", "left", "down", "up", "up" }) do key(k); love.update(1 / 60); love.draw() end
+    key("escape")
+  end
   if i == 400 then key("f5"); love.update(1 / 60); key("f6"); love.update(1 / 60); key("f5") end
 end
 print(string.format("smoke ok, frame %d, zoom tra %.2f e %.2f", frames, zmin_seen, zmax_seen))

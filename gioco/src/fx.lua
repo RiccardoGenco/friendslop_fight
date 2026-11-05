@@ -127,6 +127,9 @@ end
 
 -- chiamata a ogni passo della simulazione: atterraggi, scie dello scatto, vita
 function Fx.track(game)
+  if game.phase == "countdown" and game.timer % 60 == 0 and game.timer > 0 then
+    Audio.play("tick", game.timer <= 60 and 1.5 or 1.1, 0.8)
+  end
   for _, p in ipairs(game.players) do
     local s = Fx.pstate(p.id)
     if p.alive then

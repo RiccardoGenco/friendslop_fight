@@ -334,4 +334,25 @@ function Heroes.draw(hero, skin_i, p, team, alpha, flash, time, ps)
   lg.pop()
 end
 
+-- solo la testa, come icona (HUD, podio). gray: versione spenta per chi e' eliminato
+function Heroes.draw_head(hero, skin_i, x, y, s, alpha, gray)
+  lg = love.graphics
+  local h = Heroes.get(hero)
+  local P = Heroes.skin(h, skin_i).pal
+  lg.push()
+  lg.translate(x, y)
+  lg.scale(s or 1)
+  for _, r in ipairs(h.runs) do
+    local c = (r[1] == "O") and OUTLINE or (P[r[1]] or P.F)
+    if gray then
+      local v = (c[1] + c[2] + c[3]) / 3 * 0.6
+      lg.setColor(v, v, v, alpha or 1)
+    else
+      lg.setColor(c[1], c[2], c[3], alpha or 1)
+    end
+    lg.rectangle("fill", r[2], r[3], r[4], 1)
+  end
+  lg.pop()
+end
+
 return Heroes

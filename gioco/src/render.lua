@@ -8,6 +8,7 @@ local Combat = require("src.sim.combat")
 local Sprites = require("src.sprites")
 local Fx = require("src.fx")
 local Look = require("src.look")
+local Heroes = require("src.heroes")
 
 local lg = love.graphics
 local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
@@ -809,24 +810,57 @@ end
 -- ---------------------------------------------------------------------------
 -- Interfaccia
 
+-- schede dei giocatori in alto: faccia dell'eroe, vita, vittorie, arma
 local function draw_hud(game, time)
   local n = #game.players
-  local slot_w = (Render.W - 16) / n
+  local gap = 4
+  local cw = min(104, (Render.W - 16 - gap * (n - 1)) / n)
+  local x0 = (Render.W - (cw * n + gap * (n - 1))) / 2
   for i, p in ipairs(game.players) do
-    local x = 8 + (i - 1) * slot_w
-    local y = 3
-    lg.setColor(p.color[1], p.color[2], p.color[3], p.alive and 1 or 0.35)
-    lg.rectangle("fill", x, y + 2, 8, 8)
-    for k = 1, game.wins_target do
-      if k <= game.scores[i] then lg.setColor(1, 0.9, 0.3) else lg.setColor(0.3, 0.32, 0.42) end
-      lg.rectangle("fill", x + 12 + (k - 1) * 6, y + 5, 4, 4)
+    local x, y = floor(x0 + (i - 1) * (cw + gap)), 3
+    local c = p.color
+    local a = p.alive and 1 or 0.55
+    local lo = Look.loadout[i] or {}
+    lg.setColor(0, 0, 0, 0.55 * a)
+    lg.rectangle("fill", x, y, cw, 24, 4, 4)
+    lg.setColor(c[1], c[2], c[3], a)
+    lg.rectangle("fill", x, y, 3, 24, 2, 2)
+    lg.setColor(c[1], c[2], c[3], 0.6 * a)
+    lg.rectangle("line", x + 0.5, y + 0.5, cw - 1, 23, 4, 4)
+    -- faccia: sobbalza quando prende un colpo, grigia se eliminato
+    local ps = Fx.pstate(p.id)
+    local jig = (ps.white or 0) > 0 and 1 or 0
+    Heroes.draw_head(lo.hero or "gatto", lo.skin or 1, x + 5 + jig, y + 5, 1, a, not p.alive)
+    if not p.alive then
+      lg.setColor(1, 0.3, 0.3, 0.9)
+      lg.setLineWidth(2)
+      lg.line(x + 6, y + 6, x + 17, y + 17); lg.line(x + 17, y + 6, x + 6, y + 17)
+      lg.setLineWidth(1)
     end
+    -- vita con la parte persa che si consuma
+    local bx, bw = x + 22, cw - 26
+    local hpf = max(0, p.hp) / data.player.hp
+    local chipf = max(0, ps.chip or p.hp) / data.player.hp
+    lg.setColor(0.12, 0.12, 0.16, a)
+    lg.rectangle("fill", bx, y + 4, bw, 4, 2, 2)
+    if chipf > hpf then lg.setColor(1, 1, 1, 0.8 * a); lg.rectangle("fill", bx, y + 4, bw * chipf, 4, 2, 2) end
+    if hpf < 0.3 and p.alive and floor(time * 6) % 2 == 0 then lg.setColor(1, 0.95, 0.9)
+    else lg.setColor(1 - hpf * 0.7, 0.35 + 0.6 * hpf, 0.3, a) end
+    if hpf > 0 then lg.rectangle("fill", bx, y + 4, max(2, bw * hpf), 4, 2, 2) end
+    -- vittorie
+    for k = 1, game.wins_target do
+      if k <= game.scores[i] then lg.setColor(1, 0.85, 0.25, a) else lg.setColor(0.28, 0.28, 0.36, a) end
+      lg.circle("fill", bx + 2 + (k - 1) * 6, y + 12, 2)
+    end
+    -- arma
     if p.weapon then
       local def = data.weapons[p.weapon.id]
-      local amount = p.weapon.ammo or p.weapon.uses or 0
+      local amount = p.weapon.ammo or p.weapon.uses
       local rc = data.tiers[p.weapon.tier or 1].color
-      Render.text((def.short or def.name) .. " " .. amount, x + 14 + game.wins_target * 6, y + 2,
-        { rc[1], rc[2], rc[3], p.alive and 1 or 0.4 }, "small")
+      Render.text((def.short or def.name) .. (amount and (" " .. amount) or ""), bx, y + 14,
+        { rc[1], rc[2], rc[3], a }, "small", "left", bw)
+    else
+      Render.text("a mani nude", bx, y + 14, { 0.5, 0.5, 0.6, a }, "small", "left", bw)
     end
   end
 end
@@ -834,23 +868,56 @@ end
 local function draw_banner(game, time)
   local W, H = Render.W, Render.H
   local R = data.round
+  local function winner_name(id)
+    local lo = Look.loadout[id]
+    return lo and Heroes.get(lo.hero).name or data.color_names[((id - 1) % #data.color_names) + 1]
+  end
   if game.phase == "countdown" then
+    -- numero che "salta" a ogni secondo, poi VIA! che esplode
     local secs = math.ceil(game.timer / 60)
-    local label = (game.timer > 15) and tostring(secs) or "VIA!"
-    if game.timer <= 15 then label = "VIA!" end
-    lg.setColor(0, 0, 0, 0.35)
-    lg.rectangle("fill", 0, H / 2 - 50, W, 100)
-    Render.text("ROUND " .. game.round .. "  -  " .. game.world.name, W / 2, H / 2 - 44, { 1, 1, 1 }, "mid", "center", W)
-    Render.text(label, W / 2, H / 2 - 18, { 1, 0.9, 0.3 }, "big", "center", W)
-    local first = game.players[1]
+    local frac = (game.timer % 60) / 60
+    local go = game.timer <= 15
+    local label = go and "VIA!" or tostring(secs)
+    local pop = go and (1 + (15 - game.timer) / 15 * 0.8) or (1 + 0.6 * max(0, frac - 0.75) * 4)
+    local band = 0.45 * min(1, (data.round.countdown - game.timer) / 12)
+    lg.setColor(0, 0, 0, band)
+    lg.rectangle("fill", 0, H / 2 - 52, W, 104)
+    lg.setColor(1, 0.85, 0.3, band)
+    lg.rectangle("fill", 0, H / 2 - 52, W, 2); lg.rectangle("fill", 0, H / 2 + 50, W, 2)
+    Render.text("ROUND " .. game.round, W / 2, H / 2 - 46, { 1, 1, 1 }, "mid", "center", W)
+    Render.text(string.upper(game.world.name), W / 2, H / 2 + 34, { 0.7, 0.75, 0.95 }, "small", "center", W)
+    lg.push()
+    lg.translate(W / 2, H / 2 + 2)
+    lg.scale(pop * (go and 1.3 or 1))
+    Render.text(label, 0, -16, go and { 0.5, 1, 0.5, go and min(1, game.timer / 8) or 1 } or { 1, 0.9, 0.3 },
+      "big", "center", W)
+    lg.pop()
   elseif game.phase == "roundend" then
-    local names = {}
-    for _, id in ipairs(game.winners) do names[#names + 1] = data.color_names[((id - 1) % #data.color_names) + 1] end
-    local msg = (#names == 0) and "Pareggio" or ("Punto a " .. table.concat(names, " e "))
-    lg.setColor(0, 0, 0, 0.3)
-    lg.rectangle("fill", 0, H / 2 - 20, W, 40)
-    local wc = (#game.winners > 0) and game.players[game.winners[1]].color or { 1, 1, 1 }
-    Render.text(msg, W / 2, H / 2 - 8, wc, "mid", "center", W)
+    local k = min(1, (data.round.end_delay - game.timer) / 15)
+    local ek = 1 - (1 - k) ^ 3
+    lg.setColor(0, 0, 0, 0.45 * ek)
+    lg.rectangle("fill", 0, H / 2 - 34, W, 68)
+    if #game.winners == 0 then
+      Render.text("PAREGGIO", W / 2, H / 2 - 16, { 1, 1, 1, ek }, "big", "center", W)
+    else
+      local id = game.winners[1]
+      local wc = game.players[id].color
+      local lo = Look.loadout[id] or {}
+      local names = {}
+      for _, w in ipairs(game.winners) do names[#names + 1] = winner_name(w) end
+      local xoff = (1 - ek) * -60
+      lg.setColor(wc[1], wc[2], wc[3], ek)
+      lg.rectangle("fill", 0, H / 2 - 34, W, 2); lg.rectangle("fill", 0, H / 2 + 32, W, 2)
+      Heroes.draw_head(lo.hero or "gatto", lo.skin or 1, W / 2 - 150 + xoff, H / 2 - 26, 4, ek)
+      Render.text("PUNTO A", W / 2 + 20 - xoff, H / 2 - 26, { 1, 1, 1, ek }, "mid", "center", 300)
+      Render.text(table.concat(names, " e "), W / 2 + 20 - xoff, H / 2 - 6, { wc[1], wc[2], wc[3], ek }, "mid", "center", 300)
+      local sc = game.scores[id] or 0
+      for s2 = 1, game.wins_target do
+        if s2 <= sc then lg.setColor(1, 0.85, 0.25, ek) else lg.setColor(0.3, 0.3, 0.4, ek) end
+        local pop2 = (s2 == sc) and (1 + 0.6 * (1 - ek)) or 1
+        lg.circle("fill", W / 2 + 20 - (game.wins_target - 1) * 6 + (s2 - 1) * 12, H / 2 + 20, 4 * pop2)
+      end
+    end
   end
   if Fx.banner and game.phase == "playing" then
     local b = Fx.banner
@@ -875,9 +942,9 @@ local function draw_banner(game, time)
   end
   if game.phase == "playing" and game.round_frame >= R.sudden_death_warning and not game.lava_on
      and floor(time * 4) % 2 == 0 then
-    Render.text("LAVA IN ARRIVO!", W / 2, 28, { 1, 0.4, 0.2 }, "mid", "center", W)
+    Render.text("LAVA IN ARRIVO!", W / 2, 32, { 1, 0.4, 0.2 }, "mid", "center", W)
   elseif game.lava_on and game.phase == "playing" then
-    Render.text("MORTE IMPROVVISA", W / 2, 28, { 1, 0.4, 0.2 }, "small", "center", W)
+    Render.text("MORTE IMPROVVISA", W / 2, 32, { 1, 0.4, 0.2 }, "small", "center", W)
   end
 end
 
