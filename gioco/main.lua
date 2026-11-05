@@ -51,6 +51,7 @@ function love.load(args)
   Audio.load()
   Sprites.load()
   Profile.load()
+  Menu.apply_settings()
   love.mouse.setVisible(false)
 end
 
@@ -402,7 +403,7 @@ function love.draw()
   local cw, ch = Render.W * Render.SS, Render.H * Render.SS
   local sw, sh = lg.getDimensions()
   local s = math.min(sw / cw, sh / ch)
-  if s >= 1 then s = math.floor(s) end
+  if s >= 1 and Profile.data.settings.pixel_perfect then s = math.floor(s) end
   local ox = math.floor((sw - cw * s) / 2)
   local oy = math.floor((sh - ch * s) / 2)
   screen = { ox = ox, oy = oy, s = s * Render.SS }   -- da pixel dello schermo a coordinate virtuali
@@ -488,7 +489,9 @@ function love.keypressed(key)
     if Debug.keypressed(key) then return end
   end
   if key == "f11" then
-    love.window.setFullscreen(not love.window.getFullscreen())
+    Profile.data.settings.fullscreen = not love.window.getFullscreen()
+    Menu.apply_settings()
+    Profile.save()
     return
   end
   if state == "menu" then

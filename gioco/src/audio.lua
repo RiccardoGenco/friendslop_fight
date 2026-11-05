@@ -1,7 +1,7 @@
 -- Effetti sonori generati dal codice (segnaposto): nessun file audio necessario.
 -- Quando avrai suoni veri basta sostituire le voci di Audio.sources.
 
-local Audio = { sources = {}, enabled = true, active = {} }
+local Audio = { sources = {}, enabled = true, active = {}, sfx_vol = 0.64, music_mul = 0.48 }
 
 local RATE = 22050
 
@@ -115,7 +115,7 @@ end
 function Audio.update_music(dt, on)
   local m = Audio.music
   if not m or not Audio.enabled then return end
-  local target = on and 0.55 or 0
+  local target = on and Audio.music_mul or 0
   Audio.music_vol = Audio.music_vol + (target - Audio.music_vol) * math.min(1, dt * 2)
   if Audio.music_vol > 0.01 then
     if not m:isPlaying() then m:play() end
@@ -138,7 +138,8 @@ function Audio.play(name, pitch, volume)
   if #alive >= 12 then return end
   local c = src:clone()
   c:setPitch(pitch or 1)
-  c:setVolume(volume or 0.8)
+  if Audio.sfx_vol <= 0 then return end
+  c:setVolume((volume or 0.8) * Audio.sfx_vol)
   c:play()
   Audio.active[#Audio.active + 1] = c
 end

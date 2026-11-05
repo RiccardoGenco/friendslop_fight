@@ -155,7 +155,7 @@ end
 
 function Fx.draw_screen(W, H)
   if Fx.flash > 0 then
-    love.graphics.setColor(1, 1, 1, Fx.flash * 0.45)
+    love.graphics.setColor(1, 1, 1, Fx.flash * 0.45 * (Fx.flash_mul or 1))
     love.graphics.rectangle("fill", 0, 0, W, H)
   end
 end
@@ -324,7 +324,8 @@ end
 function Fx.offset()
   local sx, sy = 0, 0
   if Fx.shake > 0.05 then sx, sy = rnd(-Fx.shake, Fx.shake), rnd(-Fx.shake, Fx.shake) end
-  return math.floor(sx + Fx.kx + 0.5), math.floor(sy + Fx.ky + 0.5)
+  local m = Fx.shake_mul or 1
+  return math.floor((sx + Fx.kx) * m + 0.5), math.floor((sy + Fx.ky) * m + 0.5)
 end
 
 function Fx.draw()

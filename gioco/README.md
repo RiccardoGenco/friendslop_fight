@@ -1,4 +1,4 @@
-# Friendslop Fight (prototipo v0.6)
+# Friendslop Fight (prototipo v0.7)
 
 Platform fighter laterale 2D su schermo condiviso, 2-6 giocatori, vince l'ultimo in piedi. Match a 5 vittorie (3 con due giocatori).
 
@@ -14,6 +14,7 @@ Ritmo e bilanciamento con partite tra bot: `luajit tests/balance.lua [partite] [
 All'avvio: Gioca, Personaggi, Obiettivi, Esci. Frecce/WASD o croce/levetta per muoversi, Invio/A per scegliere, Esc/B per tornare. Funziona anche col mouse (click, tasto destro per tornare, rotella per scorrere).
 - **Personaggi**: sei animali guerrieri (gatto ninja, rana samurai, orso pirata, volpe cowboy, coniglio vichingo, procione ladro), tre skin ciascuno. Si comprano con le monete; le skin leggendarie si sbloccano con gli obiettivi. Invio/A su uno sbloccato lo imposta come preferito.
 - **Obiettivi**: progressi e ricompense.
+- **Impostazioni**: volume generale, musica ed effetti; schermo intero, vsync, scala pixel perfetta, intensità di scosse e lampi. Si salvano nel profilo (anche F11).
 - **Monete**: a fine partita, solo per i giocatori umani (partita giocata, eliminazioni, round e partite vinte).
 Il profilo si salva nella cartella dati di LÖVE (`profilo.lua`).
 

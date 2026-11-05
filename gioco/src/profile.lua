@@ -28,8 +28,16 @@ Profile.REWARD = { match = 20, kill = 5, round = 3, win = 30 }
 
 local EXPLOSIVE = { grenade = true, bazooka = true, mines = true, swarm = true }
 
+Profile.DEFAULT_SETTINGS = {
+  master = 0.8, music = 0.6, sfx = 0.8,                  -- volumi 0..1
+  fullscreen = false, vsync = true, pixel_perfect = true, -- video
+  shake = 1, flash = 1,                                  -- intensita' di scosse e lampi 0..1
+}
+
 local function fresh()
-  return { coins = 0, owned = {}, done = {}, stats = {}, fav = { hero = "gatto", skin = 1 } }
+  local st = {}
+  for k, v in pairs(Profile.DEFAULT_SETTINGS) do st[k] = v end
+  return { coins = 0, owned = {}, done = {}, stats = {}, fav = { hero = "gatto", skin = 1 }, settings = st }
 end
 
 local p = fresh()
@@ -65,6 +73,9 @@ function Profile.load()
     if good and type(t) == "table" then
       local base = fresh()
       for k, v in pairs(base) do if type(t[k]) ~= type(v) then t[k] = v end end
+      for k, v in pairs(Profile.DEFAULT_SETTINGS) do
+        if type(t.settings[k]) ~= type(v) then t.settings[k] = v end
+      end
       p = t
     end
   end

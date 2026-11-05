@@ -22,6 +22,7 @@ local ITEMS = {
   { id = "play", label = "GIOCA", sub = "2-6 giocatori, ultimo in piedi vince" },
   { id = "heroes", label = "PERSONAGGI", sub = "eroi, skin e negozio" },
   { id = "achievements", label = "OBIETTIVI", sub = "sfide e ricompense" },
+  { id = "settings", label = "IMPOSTAZIONI", sub = "audio e video" },
   { id = "quit", label = "ESCI", sub = "a presto" },
 }
 
@@ -38,6 +39,79 @@ local function sfx(name, pitch) Audio.play(name, pitch or 1, 0.7) end
 local function ease(cur, target, dt, speed) return cur + (target - cur) * min(1, dt * (speed or 14)) end
 local function setc(c, a) lg.setColor(c[1], c[2], c[3], a or c[4] or 1) end
 local function lerpc(a, b, t) return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t } end
+
+-- ---------------------------------------------------------------------------
+-- Impostazioni
+
+local SETTINGS = {
+  { header = "AUDIO" },
+  { key = "master", label = "Volume generale", kind = "slider" },
+  { key = "music", label = "Musica", kind = "slider" },
+  { key = "sfx", label = "Effetti sonori", kind = "slider" },
+  { header = "VIDEO" },
+  { key = "fullscreen", label = "Schermo intero", kind = "toggle" },
+  { key = "vsync", label = "Sincronia verticale (vsync)", kind = "toggle" },
+  { key = "pixel_perfect", label = "Scala pixel perfetta", kind = "toggle" },
+  { key = "shake", label = "Scosse dello schermo", kind = "slider" },
+  { key = "flash", label = "Lampi a schermo", kind = "slider" },
+  { key = "reset", label = "Ripristina predefinite", kind = "action" },
+}
+local SEL_ROWS = {}
+for i, r in ipairs(SETTINGS) do if not r.header then SEL_ROWS[#SEL_ROWS + 1] = i end end
+
+-- applica volumi, finestra ed effetti; da chiamare dopo ogni modifica
+function Menu.apply_settings()
+  local st = Profile.data.settings
+  Audio.sfx_vol = st.master * st.sfx
+  Audio.music_mul = st.master * st.music
+  local Fx = require("src.fx")
+  Fx.shake_mul, Fx.flash_mul = st.shake, st.flash
+  local w = love.window
+  if w and w.getFullscreen then
+    pcall(function()
+      if w.getFullscreen() ~= st.fullscreen then w.setFullscreen(st.fullscreen, "desktop") end
+      if w.getVSync and w.setVSync and (w.getVSync() ~= 0) ~= st.vsync then w.setVSync(st.vsync and 1 or 0) end
+    end)
+  end
+end
+
+local function set_setting(row, value)
+  local st = Profile.data.settings
+  if row.kind == "slider" then
+    value = math.floor(max(0, min(1, value)) * 10 + 0.5) / 10
+    if value == st[row.key] then return end
+    st[row.key] = value
+  elseif row.kind == "toggle" then
+    st[row.key] = value
+  end
+  Menu.apply_settings()
+  sfx("ui_move", 0.8 + 0.4 * (type(value) == "number" and value or 1))
+end
+
+local function settings_press(b)
+  local row = SETTINGS[SEL_ROWS[Menu.sel]]
+  local st = Profile.data.settings
+  if b == "up" or b == "down" then
+    Menu.sel = (Menu.sel - 1 + (b == "up" and -1 or 1)) % #SEL_ROWS + 1
+    sfx("ui_move")
+  elseif b == "left" or b == "right" then
+    local d = b == "left" and -1 or 1
+    if row.kind == "slider" then set_setting(row, st[row.key] + d * 0.1)
+    elseif row.kind == "toggle" then set_setting(row, d > 0) end
+  elseif b == "ok" then
+    if row.kind == "toggle" then set_setting(row, not st[row.key])
+    elseif row.kind == "action" then
+      for k, v in pairs(Profile.DEFAULT_SETTINGS) do st[k] = v end
+      Menu.apply_settings()
+      Menu.flash = 0.3
+      sfx("ui_ok")
+    end
+  elseif b == "back" then
+    Profile.save()
+    sfx("ui_back")
+    Menu.open("main", -1)
+  end
+end
 
 -- ---------------------------------------------------------------------------
 -- Navigazione
@@ -114,6 +188,8 @@ function Menu.press(b)
     elseif b == "down" then skin_step(1)
     elseif b == "ok" then hero_action()
     elseif b == "back" then sfx("ui_back"); Menu.open("main", -1) end
+  elseif s == "settings" then
+    settings_press(b)
   elseif s == "achievements" then
     local maxs = max(0, #Profile.ACHIEVEMENTS - 6)
     if b == "up" and Menu.scroll > 0 then Menu.scroll = Menu.scroll - 1; sfx("ui_move")
@@ -391,7 +467,7 @@ local function draw_main(time, W, H)
   end
   title(W, 18, time)
   for i, it in ipairs(ITEMS) do
-    local y = 104 + (i - 1) * 34
+    local y = 98 + (i - 1) * 30
     local on = i == Menu.sel
     local k = anim("item" .. i, on)
     local w = 200 + 20 * k
@@ -412,8 +488,8 @@ local function draw_main(time, W, H)
       function() Menu.sel = i; return Menu.press("ok") end)
   end
   local it = ITEMS[Menu.sel]
-  Render.text(it.sub, W / 2, 242, UI.dim, "small", "center", W)
-  Render.text("v0.6", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text(it.sub, W / 2, 252, UI.dim, "small", "center", W)
+  Render.text("v0.7", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 
@@ -582,6 +658,70 @@ local function draw_achievements(time, W, H)
   footer("Su/giu o rotella: scorri    Esc/B: indietro", W, H)
 end
 
+local function draw_settings(time, W, H)
+  Render.text("IMPOSTAZIONI", W / 2, 6, UI.gold, "big", "center", W)
+  local st = Profile.data.settings
+  local x, w = 110, W - 220
+  panel(x - 10, 44, w + 20, 288 - 44)
+  local y = 50
+  for i, row in ipairs(SETTINGS) do
+    if row.header then
+      Render.text(row.header, x + 4, y + 6, UI.coral, "small", "left", 200)
+      lg.setColor(UI.coral[1], UI.coral[2], UI.coral[3], 0.3)
+      lg.rectangle("fill", x + 50, y + 10, w - 54, 1)
+      y = y + 18
+    else
+      local idx
+      for k, v in ipairs(SEL_ROWS) do if v == i then idx = k end end
+      local on = Menu.sel == idx
+      local k = anim("set" .. i, on)
+      setc(lerpc(UI.panel, UI.panel_l, 0.3 + 0.7 * k))
+      lg.rectangle("fill", x, y, w, 21, 4, 4)
+      if k > 0.05 then
+        lg.setColor(UI.gold[1], UI.gold[2], UI.gold[3], k)
+        lg.rectangle("fill", x, y + 3, 3, 15, 1, 1)
+      end
+      Render.text(row.label, x + 12 + 3 * k, y + 2, on and UI.gold or UI.text, "mid", "left", 260)
+      local cx = x + w - 170
+      if row.kind == "slider" then
+        local v = st[row.key]
+        local bw = 120
+        setc(UI.ink); lg.rectangle("fill", cx, y + 8, bw, 6, 3, 3)
+        setc(on and UI.gold or UI.dim); lg.rectangle("fill", cx, y + 8, max(4, bw * v), 6, 3, 3)
+        lg.setColor(1, 1, 1); lg.circle("fill", cx + bw * v, y + 11, 4 + k)
+        setc(UI.ink); lg.circle("line", cx + bw * v, y + 11, 4 + k)
+        Render.text(floor(v * 100 + 0.5) .. "%", cx + bw + 10, y + 6, UI.dim, "small", "left", 40)
+        local function from_mouse()
+          if love.mouse and love.mouse.isDown and love.mouse.isDown(1) then
+            set_setting(row, (Menu.mx - cx) / bw)
+          end
+        end
+        hit(x, y, w, 21, function()
+          if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end
+          from_mouse()
+        end, function()
+          Menu.sel = idx
+          if Menu.mx >= cx - 6 then set_setting(row, (Menu.mx - cx) / bw) end
+        end)
+      elseif row.kind == "toggle" then
+        local v = st[row.key]
+        local kk = anim("tog" .. i, v)
+        setc(lerpc(UI.ink, UI.green, kk * 0.8)); lg.rectangle("fill", cx, y + 4, 34, 13, 6, 6)
+        lg.setColor(1, 1, 1); lg.circle("fill", cx + 7 + 20 * kk, y + 10.5, 5)
+        Render.text(v and "SI" or "NO", cx + 44, y + 6, v and UI.green or UI.dim, "small", "left", 40)
+        hit(x, y, w, 21, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
+          function() Menu.sel = idx; settings_press("ok") end)
+      else
+        Render.text("Invio", cx, y + 6, UI.dim, "small", "left", 80)
+        hit(x, y, w, 21, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
+          function() Menu.sel = idx; settings_press("ok") end)
+      end
+      y = y + 23
+    end
+  end
+  footer("Su/giu: scegli    Sinistra/destra o click: cambia    Esc/B: salva e torna", W, H)
+end
+
 function Menu.draw(time)
   local W, H = Render.W, Render.H
   Menu.hits = {}
@@ -593,6 +733,7 @@ function Menu.draw(time)
   lg.translate((1 - k) * 60 * Menu.dir, 0)
   if Menu.screen == "main" then draw_main(time, W, H)
   elseif Menu.screen == "heroes" then draw_heroes(time, W, H)
+  elseif Menu.screen == "settings" then draw_settings(time, W, H)
   else draw_achievements(time, W, H) end
   lg.pop()
   if Menu.trans < 1 then

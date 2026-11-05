@@ -1,7 +1,7 @@
 function love.conf(t)
   t.identity = "partygame"
   t.version = "11.5"
-  t.window.title = "Party Game - prototipo v0.3"
+  t.window.title = "Friendslop Fight"
   t.window.width = 1280
   t.window.height = 720
   t.window.resizable = true

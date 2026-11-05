@@ -54,7 +54,16 @@ key("down"); key("return"); frame()                 -- personaggi
 love.mousemoved(900, 500); love.mousepressed(900, 500, 1); frame()
 love.mousepressed(60, 30, 1); frame()               -- indietro
 key("down"); key("return"); frame(); love.wheelmoved(0, -1); frame(); key("escape")
-key("up"); key("up")
+-- impostazioni: cursori, interruttori, click e trascinamento, ripristino
+local Menu = require("src.menu")
+Menu.open("settings"); frame()
+assert(Menu.screen == "settings")
+for _, k in ipairs({ "left", "left", "down", "right", "down", "down", "down", "return", "down", "return",
+                     "down", "left", "down", "down", "return" }) do key(k); frame() end
+love.mousemoved(800, 200); love.mousepressed(800, 200, 1); frame()
+key("escape"); frame()
+assert(Menu.screen == "main")
+Menu.sel = 1
 for _ = 1, 30 do frame() end
 key("return")
 key("f1")
