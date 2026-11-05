@@ -6,7 +6,7 @@ local Audio = require("src.audio")
 
 local Fx = { particles = {}, ghosts = {}, rings = {}, shake = 0,
              freeze = 0, kx = 0, ky = 0, flash = 0, flashes = {}, pl = {}, bolts = {}, banner = nil,
-             columns = {}, decals = {}, muzzles = {} }
+             columns = {}, decals = {}, muzzles = {}, labels = {} }
 
 local function rnd(a, b) return a + love.math.random() * (b - a) end
 
@@ -14,6 +14,13 @@ function Fx.reset()
   Fx.particles, Fx.ghosts, Fx.rings, Fx.shake = {}, {}, {}, 0
   Fx.freeze, Fx.kx, Fx.ky, Fx.flash, Fx.flashes, Fx.pl = 0, 0, 0, 0, {}, {}
   Fx.bolts, Fx.banner, Fx.columns, Fx.decals, Fx.muzzles = {}, nil, {}, {}, {}
+  Fx.labels = {}
+end
+
+-- scritta che sale e svanisce sopra un punto del mondo (la disegna render.lua)
+function Fx.label(x, y, text, color, life)
+  Fx.labels[#Fx.labels + 1] = { x = x, y = y, text = text, color = color or { 1, 1, 1 },
+                                life = life or 1.4, max = life or 1.4 }
 end
 
 function Fx.add_shake(v)
@@ -363,6 +370,20 @@ function Fx.handle(e, game)
   elseif t == "break" then
     Fx.burst(e.x, e.y, { 0.8, 0.8, 0.8 }, 10, 120, 0.4, 300)
     Audio.play("break_")
+  elseif t == "fuse_start" then
+    Audio.play("tick", 0.7, 0.6)
+  elseif t == "fuse_cancel" then
+    if e.why == "interrotta" then
+      Fx.burst(e.x, e.y - 18, { 0.7, 0.6, 0.5 }, 6, 70, 0.25, 200)
+      Audio.play("break_", 1.5, 0.5)
+    end
+  elseif t == "fused" then
+    Fx.sparks(e.x, e.y, e.recipe and { 1, 0.85, 0.3 } or { 1, 0.7, 0.3 }, e.recipe and 26 or 16, 180, 0.45, 200)
+    Fx.burst(e.x, e.y, { 1, 0.95, 0.7 }, 10, 90, 0.3, 0)
+    Fx.add_shake(e.recipe and 4 or 2)
+    Audio.play("pickup", 0.75, 0.9)
+    Audio.play("clash", 1.4, 0.5)
+    Fx.label(e.x, e.y - 30, (e.name or "") .. "!", e.recipe and { 1, 0.85, 0.35 } or { 1, 0.9, 0.7 })
   elseif t == "telegraph" then
     Audio.play("telegraph", e.crate and 0.7 or 1)
   elseif t == "item_spawn" then
@@ -425,6 +446,12 @@ function Fx.handle(e, game)
 end
 
 function Fx.update(dt)
+  for i = #Fx.labels, 1, -1 do
+    local l = Fx.labels[i]
+    l.life = l.life - dt
+    l.y = l.y - 14 * dt
+    if l.life <= 0 then table.remove(Fx.labels, i) end
+  end
   for i = #Fx.particles, 1, -1 do
     local p = Fx.particles[i]
     p.life = p.life - dt

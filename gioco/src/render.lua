@@ -9,6 +9,13 @@ local Sprites = require("src.sprites")
 local Fx = require("src.fx")
 local Look = require("src.look")
 local Heroes = require("src.heroes")
+local Fusion = require("src.sim.fusion")
+
+-- ricette speciali gia' scoperte (dal profilo, se c'e')
+local function discovered()
+  local ok, Profile = pcall(require, "src.profile")
+  return ok and Profile and Profile.data and Profile.data.recipes or nil
+end
 
 local lg = love.graphics
 local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
@@ -236,6 +243,81 @@ local function draw_hand(p, ox)
   lg.rectangle("fill", ox - 1, -1, 2, 2)
 end
 
+-- Aura delle armi fuse: bagliore nel colore del donatore e un dettaglio del suo tratto
+local TRAIT_FX = {
+  fuoco = "fire", esplosivo = "spark", bolla = "bubble", folata = "wind", trappola = "spark",
+  perforante = "streak", ritorno = "orbit", raffica = "spark", uncino = "orbit", aggancio = "orbit",
+}
+local function draw_fused_aura(w, x, y, time, scale)
+  local f = w and w.fused
+  if not f then return end
+  scale = scale or 1
+  local donor = data.weapons[f.donor]
+  local c = donor and donor.color or { 1, 1, 1 }
+  if f.recipe then c = { 1, 0.82, 0.3 } end
+  lg.setBlendMode("add")
+  local pulse = 0.5 + 0.5 * sin(time * 6)
+  lg.setColor(c[1], c[2], c[3], 0.16 + 0.1 * pulse)
+  lg.circle("fill", x, y, 9 * scale)
+  lg.setColor(c[1], c[2], c[3], 0.10)
+  lg.circle("fill", x, y, 14 * scale)
+  local kind = TRAIT_FX[f.trait] or (f.recipe and "spark") or "orbit"
+  for k = 1, 4 do
+    local ph = (time * 1.6 + k * 0.25) % 1
+    if kind == "fire" then
+      lg.setColor(1, 0.85 - 0.6 * ph, 0.2, 0.9 * (1 - ph))
+      lg.rectangle("fill", x - 6 * scale + k * 3 * scale, y - ph * 14 * scale, 1.5, 1.5)
+    elseif kind == "bubble" then
+      lg.setColor(0.8, 0.95, 1, 0.8 * (1 - ph))
+      lg.circle("line", x - 5 * scale + k * 3 * scale, y - ph * 12 * scale, 1.5 + ph)
+    elseif kind == "wind" then
+      lg.setColor(0.85, 0.95, 1, 0.5 * (1 - ph))
+      lg.line(x - 8 * scale + ph * 16 * scale, y - 4 + k * 2, x - 4 * scale + ph * 16 * scale, y - 4 + k * 2)
+    elseif kind == "streak" then
+      lg.setColor(c[1], c[2], c[3], 0.7 * (1 - ph))
+      lg.rectangle("fill", x - 10 * scale + ph * 20 * scale, y - 2 + k, 3, 0.7)
+    elseif kind == "orbit" then
+      local ang = time * 4 + k * math.pi / 2
+      lg.setColor(c[1], c[2], c[3], 0.8)
+      lg.rectangle("fill", x + cos(ang) * 8 * scale - 0.5, y + sin(ang) * 5 * scale - 0.5, 1.2, 1.2)
+    else
+      local ang = k * 1.7 + time * 2
+      lg.setColor(1, 0.95, 0.6, 0.9 * (1 - ph))
+      lg.rectangle("fill", x + cos(ang) * ph * 10 * scale, y + sin(ang) * ph * 10 * scale, 1, 1)
+    end
+  end
+  lg.setBlendMode("alpha")
+end
+Render.draw_fused_aura = draw_fused_aura
+
+-- Anello della fusione in corso: si chiude in mezzo secondo, con scintille da forgia
+local function draw_fusion_ring(p, x, y, time)
+  local f = p.fusing
+  if not f then return end
+  local k = min(1, f.t / data.round.fuse_frames)
+  local cx, cy = x, y - 48
+  lg.setColor(0, 0, 0, 0.55)
+  lg.setLineWidth(3)
+  lg.circle("line", cx, cy, 7)
+  lg.setColor(1, 0.75 + 0.25 * k, 0.3, 1)
+  lg.arc("line", "open", cx, cy, 7, -math.pi / 2, -math.pi / 2 + k * math.pi * 2, 24)
+  lg.setLineWidth(1)
+  if f.item and p.weapon then
+    local name, special = Fusion.preview(p.weapon, f.item.weapon, discovered())
+    if name then
+      Render.text(name, cx, cy - 18, special and { 1, 0.85, 0.35 } or { 1, 0.9, 0.7 }, "small", "center", 160)
+    end
+  end
+  lg.setBlendMode("add")
+  for j = 1, 5 do
+    local ph = (time * 3 + j * 0.2) % 1
+    local ang = j * 1.3 + time * 5
+    lg.setColor(1, 0.7, 0.25, (1 - ph) * k)
+    lg.rectangle("fill", x + cos(ang) * (4 + ph * 12), y - 12 + sin(ang) * (4 + ph * 10), 1.2, 1.2)
+  end
+  lg.setBlendMode("alpha")
+end
+
 local function draw_held_weapon(p, game)
   local def = Player.weapon_def(p)
   local a = p.action
@@ -374,6 +456,12 @@ local function draw_player(p, game, time)
   end
 
   draw_held_weapon(p, game)
+  if p.weapon and p.weapon.fused then
+    local ax, ay = p.aimx, p.aimy
+    if not p.aim_free and (Player.weapon_def(p).kind == "melee") then ax, ay = p.facing, 0 end
+    draw_fused_aura(p.weapon, x + ax * 9, y - 11 + ay * 9, time, 0.9)
+  end
+  draw_fusion_ring(p, x, y, time)
 
   -- fuoco: fiammelle che salgono dal personaggio
   if p.burn > 0 then
@@ -462,8 +550,9 @@ end
 -- Oggetti, proiettili, annunci
 
 local function draw_items(game, time)
+  local disc = discovered()
   for _, it in ipairs(game.items) do
-    local def = data.weapons[it.weapon.id]
+    local def = it.weapon.def or data.weapons[it.weapon.id]
     local r = data.tiers[it.weapon.tier or 1]
     local bob = floor(sin(time * 4 + it.id) * 1.5)
     local blink = it.life < 180 and (floor(time * 10) % 2 == 0)
@@ -489,11 +578,54 @@ local function draw_items(game, time)
       end
     end
     lg.setBlendMode("alpha")
-    -- nome dell'arma quando un giocatore e' vicino
+    -- nome dell'arma quando un giocatore e' vicino; chi ci sta sopra con un'arma in mano
+    -- vede l'anteprima della fusione
+    local preview_by, being_fused
     for _, p in ipairs(game.players) do
-      if p.alive and abs(p.x - it.x) < 40 and abs(p.y - it.y) < 30 then
-        Render.text(def.short or def.name, gx, gy - 26 + bob, { c[1], c[2], c[3] }, "small", "center", 80)
-        break
+      if p.fusing and p.fusing.item == it then being_fused = true end
+      if p.alive and p.weapon and not p.fusing and game:item_near(p) == it then preview_by = p; break end
+    end
+    if being_fused then
+      -- il nome del risultato e' gia' sopra l'anello della fusione
+    elseif preview_by then
+      local name, special = Fusion.preview(preview_by.weapon, it.weapon, disc)
+      local held = preview_by.weapon
+      local hdef = held.def or data.weapons[held.id]
+      local label = name or "solo scambio"
+      local bw = max(78, Render.font("small"):getWidth(label) + 14)
+      local by = floor(preview_by.y) - 66
+      lg.setColor(0.04, 0.04, 0.07, 0.85)
+      lg.rectangle("fill", gx - bw / 2, by, bw, 24, 4, 4)
+      local edge = special and { 1, 0.82, 0.3 } or (name and { 0.9, 0.7, 0.35 } or { 0.5, 0.5, 0.6 })
+      if special then
+        lg.setBlendMode("add")
+        lg.setColor(1, 0.82, 0.3, 0.25 + 0.2 * sin(time * 7))
+        lg.rectangle("fill", gx - bw / 2 - 2, by - 2, bw + 4, 28, 5, 5)
+        lg.setBlendMode("alpha")
+      end
+      lg.setColor(edge[1], edge[2], edge[3], 0.9)
+      lg.rectangle("line", gx - bw / 2 + 0.5, by + 0.5, bw - 1, 23, 4, 4)
+      -- icone: in mano  +  a terra
+      lg.push(); lg.translate(gx - 20, by + 7); lg.scale(0.7, 0.7)
+      draw_weapon_shape(hdef.id, hdef.color, true); lg.pop()
+      Render.text(name and "+" or ">", gx, by + 2, { 1, 1, 1 }, "small", "center", 20)
+      lg.push(); lg.translate(gx + 14, by + 7); lg.scale(0.7, 0.7)
+      draw_weapon_shape(def.id, def.color, true); lg.pop()
+      if name then
+        Render.text(name, gx, by + 13, special and { 1, 0.85, 0.35 } or { 1, 0.9, 0.7 }, "small", "center", bw + 60)
+      else
+        -- niente fusione possibile: lucchetto e "solo scambio"
+        lg.setColor(0.6, 0.6, 0.7)
+        lg.rectangle("fill", gx + 29, by + 6, 6, 5)
+        lg.rectangle("line", gx + 30, by + 3, 4, 4)
+        Render.text("solo scambio", gx, by + 13, { 0.65, 0.65, 0.75 }, "small", "center", bw)
+      end
+    else
+      for _, p in ipairs(game.players) do
+        if p.alive and abs(p.x - it.x) < 40 and abs(p.y - it.y) < 30 then
+          Render.text(Fusion.name(it.weapon), gx, gy - 26 + bob, { c[1], c[2], c[3] }, "small", "center", 100)
+          break
+        end
       end
     end
     if not blink then
@@ -504,6 +636,7 @@ local function draw_items(game, time)
       lg.translate(x, y - 6)
       draw_weapon_shape(def.id, def.color, true)
       lg.pop()
+      draw_fused_aura(it.weapon, x, y - 6, time, 0.8)
       lg.setColor(r.color[1], r.color[2], r.color[3])
       lg.rectangle("line", x - 7.5, y - 11.5, 15, 12)
     end
@@ -652,6 +785,13 @@ local function draw_projectiles(game, time)
     elseif pr.kind == "thrown" then
       lg.setColor(col[1], col[2], col[3])
       lg.rectangle("fill", pr.x - 4, pr.y - 3, 8, 6)
+    elseif pr.kind == "boomerang" and pr.spin_of then
+      local sd = data.weapons[pr.spin_of]
+      lg.push()
+      lg.translate(pr.x, pr.y)
+      lg.rotate(pr.age * 0.7)
+      draw_weapon_shape(pr.spin_of, sd and sd.color or col, true)
+      lg.pop()
     elseif pr.kind == "boomerang" then
       lg.push()
       lg.translate(pr.x, pr.y)
@@ -827,8 +967,14 @@ local function draw_hud(game, time)
       local def = data.weapons[p.weapon.id]
       local amount = p.weapon.ammo or p.weapon.uses
       local rc = data.tiers[p.weapon.tier or 1].color
-      Render.text((def.short or def.name) .. (amount and (" " .. amount) or ""), bx, y + 14,
-        { rc[1], rc[2], rc[3], a }, "small", "left", bw)
+      local label = p.weapon.fused and Fusion.name(p.weapon) or (def.short or def.name)
+      if p.weapon.fused then
+        -- simbolo della fusione accanto al nome
+        lg.setColor(1, 0.8, 0.3, a)
+        lg.polygon("fill", bx - 6, y + 17, bx - 3, y + 14, bx, y + 17, bx - 3, y + 20)
+      end
+      Render.text(label .. (amount and (" " .. amount) or ""), bx, y + 14,
+        { rc[1], rc[2], rc[3], a }, "small", "left", bw + 40)
     else
       Render.text("a mani nude", bx, y + 14, { 0.5, 0.5, 0.6, a }, "small", "left", bw)
     end
@@ -938,6 +1084,10 @@ function Render.game(game, time)
   draw_lava(game, time)
   Look.ambient(game.world, time)
   Fx.draw()
+  for _, l in ipairs(Fx.labels) do
+    local a = min(1, l.life / (l.max * 0.4))
+    Render.text(l.text, l.x, l.y, { l.color[1], l.color[2], l.color[3], a }, "small", "center", 160)
+  end
   lg.pop()
   Fx.draw_screen(Render.W, Render.H)
   draw_hud(game, time)

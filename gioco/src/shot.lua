@@ -29,6 +29,46 @@ function Shot.start(args)
       if sc == "game" then
         snap(100, "countdown"); snap(420, "game1"); snap(700, "game2"); snap(1100, "game3"); snap(1600, "game4")
       elseif sc == "pause" then at(500, key("escape")); snap(530, "pause")
+      elseif sc == "fusion" then
+        -- armi fuse in mano, anteprime e una fusione in corso: giocatori fermi, armi ai loro piedi
+        local spots
+        at(260, function()
+          local g = __smoke_game(); if not g then return end
+          local Fusion = require("src.sim.fusion")
+          g.items, g.projectiles, g.spawn_timer, g.crate_timer = {}, {}, 1e9, 1e9
+          -- il pavimento piu' basso con piu' punti di partenza vicini
+          local sp = {}
+          for _, s in ipairs(g.world.spawns) do sp[#sp + 1] = s end
+          table.sort(sp, function(a, b) if a.y ~= b.y then return a.y > b.y end return a.x < b.x end)
+          local floor_y, base = sp[1].y, sp[1].x
+          local held = { "pistol", "bubble", "sword", "hammer" }
+          local ground = { "flamer", "mines", "ghost", nil }
+          spots = {}
+          for k, p in ipairs(g.players) do
+            spots[k] = { x = base + (k - 1) * 85, y = floor_y }
+            p.weapon = g:make_weapon(held[k] or "pistol")
+            if ground[k] then g:add_item(spots[k].x, floor_y - 4, g:make_weapon(ground[k])) end
+          end
+          if g.players[4] then g.players[4].weapon = Fusion.fuse({ id = "hammer" }, { id = "boomerang" }) end
+          if g.players[3] then g.players[3].weapon = Fusion.fuse({ id = "shotgun" }, { id = "bubble" }) end
+        end)
+        for f = 261, 300 do at(f, function()
+          local g = __smoke_game(); if not (g and spots) then return end
+          for k, p in ipairs(g.players) do
+            p.x, p.y, p.vx, p.vy, p.freeze, p.invuln = spots[k].x, spots[k].y, 0, 0, 2, 1e9
+            p.action = nil
+          end
+        end) end
+        -- il giocatore 1 (un bot) tiene premuto il tasto raccogli: parte una fusione vera
+        at(275, function()
+          local Bot = require("src.bot")
+          local orig = Bot.think
+          Bot.think = function(game, i, lvl)
+            if i == 1 then return { pickup_held = true } end
+            return orig(game, i, lvl)
+          end
+        end)
+        snap(300, "fusion")
       elseif sc == "matchend" then
         at(300, function() local g = __smoke_game(); if g then g.scores[2] = g.wins_target - 1 end end)
         snap(2400, "matchend")

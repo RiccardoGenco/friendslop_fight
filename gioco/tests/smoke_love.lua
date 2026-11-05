@@ -100,6 +100,14 @@ for i = 1, 60 * 60 * 8 do
         if p.alive then
           local id = data.weapon_order[((i / 300 + k) % #data.weapon_order) + 1]
           p.weapon = g:make_weapon(id, "epic")
+          -- un giocatore su due riceve un'arma fusa, e accanto un'arma a terra (anteprima)
+          local Fusion = require("src.sim.fusion")
+          local id2 = data.weapon_order[((i / 300 + k * 3) % #data.weapon_order) + 1]
+          if k % 2 == 0 and Fusion.can_fuse({ id = id }, { id = id2 }) then
+            p.weapon = Fusion.fuse({ id = id }, { id = id2 })
+          end
+          g:add_item(p.x, p.y - 4, g:make_weapon(id2))
+          if k == 1 and Fusion.can_fuse(p.weapon, { id = id2 }) then p.fusing = { item = g.items[#g.items], t = 15 } end
         end
       end
     end
