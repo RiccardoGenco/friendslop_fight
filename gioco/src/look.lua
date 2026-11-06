@@ -94,6 +94,7 @@ local DEFAULT = {
 }
 THEMES.Arena.tex, THEMES.Fabbrica.tex, THEMES.Tetti.tex, THEMES.Miniera.tex = "arena", "fabbrica", "tetti", "miniera"
 DEFAULT.tex = "prova"
+DEFAULT.bg, THEMES.Laboratorio.bg = "laboratorio", "laboratorio"
 -- tinta delle texture: le accorda con la luce della mappa (tramonto, notte, grotta...)
 THEMES.Arena.tint = { 0.80, 0.68, 0.66 }
 THEMES.Arena.debris, THEMES.Fabbrica.debris = { 0.62, 0.48, 0.32 }, { 0.42, 0.50, 0.55 }
@@ -857,16 +858,54 @@ local function prepare(w)
   return cv
 end
 
+-- Sfondi dipinti (assets/backgrounds/<tema>_far.png opaco, <tema>_near.png trasparente):
+-- se ci sono prendono il posto di quelli disegnati in codice. Il cielo fuori dall'immagine
+-- usa i colori della sua riga piu' alta e di quella piu' bassa, cosi' non si vede il bordo.
+local backs = {}
+local function backdrop(name)
+  if not name then return nil end
+  local b = backs[name]
+  if b ~= nil then return b end
+  b = false
+  local function load(file)
+    local path = "assets/backgrounds/" .. file .. ".png"
+    if not love.filesystem.getInfo(path) then return nil end
+    local ok, img = pcall(lg.newImage, path)
+    if not ok then return nil end
+    img:setFilter("nearest", "nearest")
+    return img
+  end
+  local far = load(name .. "_far")
+  if far then
+    b = { far = far, near = load(name .. "_near") }
+    local ok, data = pcall(love.image.newImageData, "assets/backgrounds/" .. name .. "_far.png")
+    if ok then
+      local iw, ih = data:getDimensions()
+      local function avg(y)
+        local r, g, bl = 0, 0, 0
+        for x = 0, iw - 1, 8 do local a, c, d = data:getPixel(x, y); r, g, bl = r + a, g + c, bl + d end
+        local n = math.ceil(iw / 8)
+        return { r / n, g / n, bl / n }
+      end
+      b.top, b.bottom = avg(0), avg(ih - 1)
+    end
+  end
+  backs[name] = b
+  return b
+end
+
 -- cielo a schermo intero (prima della telecamera)
 function Look.sky(w, time, W, H)
   local th = Look.theme(w)
   local a, b = th.sky[1], th.sky[2]
+  local bd = backdrop(th.bg or th.tex)
+  if bd and bd.top then a, b = bd.top, bd.bottom end
   for i = 0, 17 do
     local t = i / 17
     lg.setColor(a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t)
     rect(0, i * H / 18, W, H / 18 + 1)
   end
-  if th.stars then
+  if th.stars and not bd then
     for i = 1, 50 do
       local tw = 0.4 + 0.6 * abs(sin(time * (0.5 + hash(i, 9)) + i))
       lg.setColor(1, 1, 1, 0.5 * tw)
@@ -880,6 +919,26 @@ function Look.back(w, cam, time)
   local cv = prepare(w)
   local th = Look.theme(w)
   local cx, cy = cam.x - w.width / 2, cam.y - w.height / 2
+  local bd = backdrop(th.bg or th.tex)
+  if bd then
+    -- immagine lontana che copre tutta la fascia dello sfondo, piu' la vicina trasparente
+    local LW, LH = w.width + PAD * 2, w.height
+    local iw, ih = bd.far:getDimensions()
+    local s = math.max(LW / iw, LH / ih)
+    lg.setColor(1, 1, 1)
+    lg.draw(bd.far, -PAD + cx * 0.7 + (LW - iw * s) / 2, cy * 0.5 + (LH - ih * s), 0, s, s)
+    if bd.near then
+      local nw, nh = bd.near:getDimensions()
+      local ns = LW / nw
+      lg.draw(bd.near, -PAD + cx * 0.4, cy * 0.25 + LH - nh * ns, 0, ns, ns)
+    end
+    local b2 = bd.bottom or th.sky[2]
+    for i = 0, 7 do
+      lg.setColor(b2[1], b2[2], b2[3], 0.04 * i)
+      rect(-PAD, w.height - 80 + i * 10, w.width + PAD * 2, 10)
+    end
+    return
+  end
   if th.moon then
     local mx, my = w.width * 0.72 + cx * 0.9, w.height * 0.2 + cy * 0.9
     lg.setColor(th.moon[1], th.moon[2], th.moon[3], 0.08); lg.circle("fill", mx, my, 40)
