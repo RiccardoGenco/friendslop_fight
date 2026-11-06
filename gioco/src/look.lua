@@ -56,7 +56,37 @@ local DEFAULT = {
   stone = { 0.23, 0.26, 0.38 }, top = { 0.40, 0.78, 0.92 }, pattern = "lab",
   plat = { 0.72, 0.62, 0.40 }, spike = { 0.68, 0.68, 0.74 }, ambient = "dust",
 }
+THEMES.Arena.tex, THEMES.Fabbrica.tex, THEMES.Tetti.tex, THEMES.Miniera.tex = "arena", "fabbrica", "tetti", "miniera"
+DEFAULT.tex = "prova"
+-- tinta delle texture: le accorda con la luce della mappa (tramonto, notte, grotta...)
+THEMES.Arena.tint = { 0.80, 0.68, 0.66 }
+THEMES.Fabbrica.tint = { 0.80, 0.86, 0.86 }
+THEMES.Tetti.tint = { 0.72, 0.72, 0.86 }
+THEMES.Miniera.tint = { 0.85, 0.74, 0.66 }
+DEFAULT.tint = { 0.85, 0.88, 1 }
 function Look.theme(world) return THEMES[world.name] or DEFAULT end
+
+-- Texture dipinte (assets/tiles/<nome>.png): 32 pixel d'arte per casella, si ripetono senza cuciture.
+-- La casella prende il pezzo che le spetta per posizione, cosi' il disegno continua da una all'altra.
+local textures = {}
+local function texture(name)
+  if not name then return nil end
+  local t = textures[name]
+  if t ~= nil then return t end
+  t = false
+  local path = "assets/tiles/" .. name .. ".png"
+  if love.filesystem.getInfo(path) then
+    local ok, img = pcall(lg.newImage, path)
+    if ok then
+      img:setFilter("nearest", "nearest")
+      local iw, ih = img:getDimensions()
+      t = { img = img, w = iw, h = ih, quad = lg.newQuad(0, 0, 32, 32, iw, ih) }
+    end
+  end
+  textures[name] = t
+  return t
+end
+Look.texture = texture
 
 -- ---------------------------------------------------------------------------
 -- Tile
@@ -162,10 +192,8 @@ local function tex_rock(s, k, c, r)
   end
 end
 
-local function tex_building(s, k, c, r, interior)
-  tex_brick(s, k, c, r, true)
-  -- finestre nelle parti interne dei palazzi
-  if interior and hash(c * 5, r * 3) < 0.35 then
+local function tex_window(s, c, r)
+  if hash(c * 5, r * 3) < 0.35 then
     local lit = hash(c, r * 9) > 0.45
     lg.setColor(0.08, 0.06, 0.07); hp(7, 5, 18, 22)
     tone(s, 1.25); hp(7, 5, 18, 2)
@@ -176,6 +204,11 @@ local function tex_building(s, k, c, r, interior)
   end
 end
 
+local function tex_building(s, k, c, r, interior)
+  tex_brick(s, k, c, r, true)
+  if interior then tex_window(s, c, r) end   -- finestre nelle parti interne dei palazzi
+end
+
 local function draw_solid(w, th, c, r, x, y, anims)
   local function open(dc, dr) return w:tile(c + dc, r + dr) ~= "#" end
   local up, dn, lf, rt = open(0, -1), open(0, 1), open(-1, 0), open(1, 0)
@@ -184,7 +217,14 @@ local function draw_solid(w, th, c, r, x, y, anims)
   local s = th.stone
   TX, TY = x, y
   local p = th.pattern
-  if p == "brick" then tex_brick(s, k, c, r)
+  local tx = texture(th.tex)
+  if tx then
+    tx.quad:setViewport(((c - 1) * 32) % tx.w, ((r - 1) * 32) % tx.h, 32, 32)
+    local tn = th.tint or { 1, 1, 1 }
+    lg.setColor(k * tn[1], k * tn[2], k * tn[3])
+    lg.draw(tx.img, tx.quad, x, y, 0, 0.5, 0.5)
+    if p == "roof" and d >= 2 then tex_window(s, c, r) end
+  elseif p == "brick" then tex_brick(s, k, c, r)
   elseif p == "panel" then tex_panel(s, k, c, r)
   elseif p == "rock" then tex_rock(s, k, c, r)
   elseif p == "roof" then tex_building(s, k, c, r, d >= 2)
@@ -563,7 +603,8 @@ local function prepare(w)
     cv = {}
     cv.far = far_layer(w, th, th.far, th.farc, false)
     cv.near = far_layer(w, th, th.far, th.nearc, true)
-    cv.map = lg.newCanvas(w.width, w.height)
+    cv.map = lg.newCanvas(w.width, w.height, { dpiscale = 2 })   -- doppia densita': le texture restano nitide
+    cv.map:setFilter("nearest", "nearest")
   end
   cv.anims, cv.version = {}, w.version
   lg.setCanvas(cv.map)
