@@ -1140,7 +1140,7 @@ end
 -- ---------------------------------------------------------------------------
 
 function Render.game(game, time)
-  Look.sky(game.world, time, Render.W, Render.H)
+  Look.sky(game.world, time, Render.W, Render.H, Cam)
   lg.push()
   Render.apply_camera()
   Look.back(game.world, Cam, time)

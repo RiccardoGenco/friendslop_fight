@@ -501,7 +501,7 @@ local function draw_main(time, W, H)
       function() Menu.sel = i; return Menu.press("ok") end)
   end
   local it = ITEMS[Menu.sel]
-  Render.text(it.sub, W / 2, 252, UI.dim, "small", "center", W)
+  Render.text(it.sub, W / 2, 98 + #ITEMS * 30 + 2, UI.dim, "small", "center", W)   -- sotto l'ultimo pulsante
   Render.text("v0.12", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end

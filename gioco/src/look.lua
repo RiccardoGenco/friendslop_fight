@@ -895,11 +895,22 @@ local function backdrop(name)
 end
 
 -- cielo a schermo intero (prima della telecamera)
-function Look.sky(w, time, W, H)
+function Look.sky(w, time, W, H, cam)
   local th = Look.theme(w)
   local a, b = th.sky[1], th.sky[2]
   local bd = backdrop(th.bg or th.tex)
-  if bd and bd.top then a, b = bd.top, bd.bottom end
+  if bd then
+    -- sfondo dipinto a schermo intero: alto quanto lo schermo, scorre piano seguendo la telecamera
+    local iw, ih = bd.far:getDimensions()
+    local s = H / ih
+    local f = 0.5
+    if cam and w.width then f = math.max(0, math.min(1, cam.x / w.width)) end
+    local fy = 0
+    if cam and w.height then fy = (math.max(0, math.min(1, cam.y / w.height)) - 0.5) * 12 end
+    lg.setColor(0.84, 0.84, 0.88)   -- un filo piu' scuro: personaggi e caselle restano in primo piano
+    lg.draw(bd.far, -(iw * s - W) * f, -fy - 6, 0, s, s * 1.04)
+    return
+  end
   for i = 0, 17 do
     local t = i / 17
     lg.setColor(a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t)
@@ -921,12 +932,9 @@ function Look.back(w, cam, time)
   local cx, cy = cam.x - w.width / 2, cam.y - w.height / 2
   local bd = backdrop(th.bg or th.tex)
   if bd then
-    -- immagine lontana che copre tutta la fascia dello sfondo, piu' la vicina trasparente
+    -- il lontano e' gia' disegnato a schermo intero (Look.sky); qui il vicino trasparente
     local LW, LH = w.width + PAD * 2, w.height
-    local iw, ih = bd.far:getDimensions()
-    local s = math.max(LW / iw, LH / ih)
     lg.setColor(1, 1, 1)
-    lg.draw(bd.far, -PAD + cx * 0.7 + (LW - iw * s) / 2, cy * 0.5 + (LH - ih * s), 0, s, s)
     if bd.near then
       local nw, nh = bd.near:getDimensions()
       local ns = LW / nw
