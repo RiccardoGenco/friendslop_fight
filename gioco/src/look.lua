@@ -79,6 +79,7 @@ local function texture(name)
     local ok, img = pcall(lg.newImage, path)
     if ok then
       img:setFilter("nearest", "nearest")
+      img:setWrap("repeat", "repeat")   -- la misura puo' non essere un multiplo della casella
       local iw, ih = img:getDimensions()
       t = { img = img, w = iw, h = ih, quad = lg.newQuad(0, 0, 32, 32, iw, ih) }
     end
@@ -358,6 +359,16 @@ end
 local function draw_breakable(w, th, c, r, x, y)
   TX, TY = x, y
   local crate = th.deco == "factory" or th.deco == "roofs"
+  local img = texture(crate and "blocco_cassa" or "blocco_pietra")
+  if img then
+    -- disegno dipinto; nella miniera la pietra prende il colore della roccia
+    local tn = crate and { 1, 1, 1 } or (th.tint or { 1, 1, 1 })
+    if th.deco == "mine" then tn = { 0.78, 0.62, 0.5 } end
+    lg.setColor(tn[1], tn[2], tn[3])
+    img.quad:setViewport(0, 0, 32, 32)
+    lg.draw(img.img, img.quad, x, y, 0, 0.5, 0.5)
+    return
+  end
   if crate then
     local wd = { 0.66, 0.45, 0.22 }
     lg.setColor(0.08, 0.05, 0.03); hp(0, 0, 32, 32)
