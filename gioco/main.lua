@@ -499,7 +499,7 @@ function fit_canvas()
   if Profile.data and Profile.data.settings and Profile.data.settings.pixel_perfect then ss = math.max(1, math.floor(ss)) end
   if __shot then ss = 2 end   -- screenshot di prova sempre uguali
   local cw, ch = math.floor(Render.W * ss + 0.5), math.floor(Render.H * ss + 0.5)
-  if canvas and canvas:getWidth() == cw and canvas:getHeight() == ch then return end
+  if canvas and Render.SS == ss then return end
   Render.SS = ss
   canvas = lg.newCanvas(cw, ch)
   canvas:setFilter("nearest", "nearest")
@@ -540,7 +540,7 @@ function love.draw()
   lg.pop()
   lg.setCanvas()
 
-  local cw, ch = canvas:getWidth(), canvas:getHeight()
+  local cw, ch = math.floor(Render.W * Render.SS + 0.5), math.floor(Render.H * Render.SS + 0.5)
   local sw, sh = lg.getDimensions()
   local s = math.min(sw / cw, sh / ch)
   if s >= 1 and Profile.data.settings.pixel_perfect then s = math.floor(s) end

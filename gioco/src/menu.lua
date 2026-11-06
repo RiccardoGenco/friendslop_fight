@@ -73,7 +73,7 @@ local function resolutions()
   local dw, dh = 99999, 99999
   if love.window and love.window.getDesktopDimensions then
     local ok, a, b = pcall(love.window.getDesktopDimensions)
-    if ok and a then dw, dh = a, b end
+    if ok and type(a) == "number" and type(b) == "number" then dw, dh = a, b end
   end
   for _, r in ipairs(RESOLUTIONS) do
     local w, h = r:match("(%d+)x(%d+)")
