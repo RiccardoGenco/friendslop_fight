@@ -286,6 +286,11 @@ local function draw_solid(w, th, c, r, x, y, anims, kind)
       lg.setColor(1, 1, 1, 0.35)
       local o = floor(hash(c, r * 5) * 12)
       hp(4 + o, 6, 2, 1); hp(6 + o, 7, 2, 1); hp(8 + o, 8, 2, 1); hp(18, 20, 3, 1); hp(21, 21, 2, 1)
+    elseif kind == "crumble" then
+      -- friabile: tutto crepato e staccato dai vicini, si capisce che non regge
+      draw_cracks(2, c, r)
+      lg.setColor(0.03, 0.02, 0.03, 0.9); hp(0, 0, 1, 32); hp(31, 0, 1, 32); hp(0, 31, 32, 1)
+      lg.setColor(0, 0, 0, 0.18); hp(0, 0, 32, 32)
     else
       draw_cracks(w:crack(c, r), c, r)
     end
@@ -833,7 +838,8 @@ local function prepare(w)
     for c = 1, w.cols do
       local t, x, y = w.grid[r][c], (c - 1) * T, (r - 1) * T
       if t == "#" and w.tnt[r][c] then draw_tnt(x, y)
-      elseif t == "#" and w.crumble[r][c] then draw_breakable(w, th, c, r, x, y)
+      elseif t == "#" and w.crumble[r][c] then
+        if texture(th.tex) then draw_solid(w, th, c, r, x, y, cv.anims, "crumble") else draw_breakable(w, th, c, r, x, y) end
       elseif t == "#" and w.breakable[r][c] then draw_solid(w, th, c, r, x, y, cv.anims)
       elseif t == "#" and w.belts[r] and w.belts[r][c] then draw_belt_base(x, y)
       elseif t == "#" and w.ice[r][c] then draw_solid(w, th, c, r, x, y, cv.anims, "ice")

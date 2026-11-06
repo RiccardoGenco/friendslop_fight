@@ -22,3 +22,11 @@ Come si fanno gli eroi (metodo corretto, con pixel netti):
    trova la griglia vera dei pixel del modello (`tools/griglia_pixel.py`: tagli dove i colori cambiano,
    colore dominante per cella) e tiene la risoluzione nativa, senza stirare.
 3. Le skin si fanno per scambio di palette (`tools/skin_palette.py`): stesse pose, colori nuovi.
+
+## Texture delle mappe (assets/tiles)
+
+- `<tema>.png`: texture ripetibile senza cuciture, 32 pixel d'arte per casella (disegnata a 0,5).
+  Generata con Qwen (immagine pixel art), ridotta al vero passo dei pixel, poi resa ripetibile:
+  si sposta di meta' lato, si fa riparare a Qwen solo la croce centrale e si rimette a posto.
+- `blocco_pietra.png`, `blocco_cassa.png`: blocchi friabili quando il tema non ha texture.
+- La roccia madre (cornice della mappa) e' la stessa texture piu' scura: e' l'unica parte che non si rompe.
