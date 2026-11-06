@@ -53,6 +53,7 @@ local SETTINGS = {
   { key = "sfx", label = "Effetti sonori", kind = "slider" },
   { header = "VIDEO" },
   { key = "fullscreen", label = "Schermo intero", kind = "toggle" },
+  { key = "resolution", label = "Risoluzione finestra", kind = "choice" },
   { key = "vsync", label = "Sincronia verticale (vsync)", kind = "toggle" },
   { key = "pixel_perfect", label = "Scala pixel perfetta", kind = "toggle" },
   { key = "shake", label = "Scosse dello schermo", kind = "slider" },
@@ -62,6 +63,24 @@ local SETTINGS = {
 }
 local SEL_ROWS = {}
 for i, r in ipairs(SETTINGS) do if not r.header then SEL_ROWS[#SEL_ROWS + 1] = i end end
+
+-- risoluzioni della finestra: solo quelle che entrano nello schermo
+local RESOLUTIONS = { "1280x720", "1600x900", "1920x1080", "2560x1440", "3840x2160" }
+local function resolutions()
+  local list = {}
+  local dw, dh = 99999, 99999
+  if love.window and love.window.getDesktopDimensions then
+    local ok, a, b = pcall(love.window.getDesktopDimensions)
+    if ok and a then dw, dh = a, b end
+  end
+  for _, r in ipairs(RESOLUTIONS) do
+    local w, h = r:match("(%d+)x(%d+)")
+    if tonumber(w) <= dw and tonumber(h) <= dh then list[#list + 1] = r end
+  end
+  if #list == 0 then list[1] = RESOLUTIONS[1] end
+  return list
+end
+Menu.resolutions = resolutions
 
 -- applica volumi, finestra ed effetti; da chiamare dopo ogni modifica
 function Menu.apply_settings()
@@ -74,6 +93,15 @@ function Menu.apply_settings()
   if w and w.getFullscreen then
     pcall(function()
       if w.getFullscreen() ~= st.fullscreen then w.setFullscreen(st.fullscreen, "desktop") end
+      if not st.fullscreen then
+        local rw, rh = (st.resolution or "1280x720"):match("(%d+)x(%d+)")
+        rw, rh = tonumber(rw), tonumber(rh)
+        local cw, ch = w.getMode()
+        if rw and (cw ~= rw or ch ~= rh) then
+          w.updateMode(rw, rh, { resizable = true, minwidth = 640, minheight = 360 })
+          if love.resize then love.resize(rw, rh) end
+        end
+      end
       if w.getVSync and w.setVSync and (w.getVSync() ~= 0) ~= st.vsync then w.setVSync(st.vsync and 1 or 0) end
     end)
   end
@@ -85,7 +113,7 @@ local function set_setting(row, value)
     value = math.floor(max(0, min(1, value)) * 10 + 0.5) / 10
     if value == st[row.key] then return end
     st[row.key] = value
-  elseif row.kind == "toggle" then
+  elseif row.kind == "toggle" or row.kind == "choice" then
     st[row.key] = value
   end
   Menu.apply_settings()
@@ -101,9 +129,15 @@ local function settings_press(b)
   elseif b == "left" or b == "right" then
     local d = b == "left" and -1 or 1
     if row.kind == "slider" then set_setting(row, st[row.key] + d * 0.1)
-    elseif row.kind == "toggle" then set_setting(row, d > 0) end
+    elseif row.kind == "toggle" then set_setting(row, d > 0)
+    elseif row.kind == "choice" then
+      local list, cur = resolutions(), 1
+      for i, r in ipairs(list) do if r == st[row.key] then cur = i end end
+      set_setting(row, list[(cur - 1 + d) % #list + 1])
+    end
   elseif b == "ok" then
     if row.kind == "toggle" then set_setting(row, not st[row.key])
+    elseif row.kind == "choice" then return settings_press("right")
     elseif row.kind == "action" then
       for k, v in pairs(Profile.DEFAULT_SETTINGS) do st[k] = v end
       Menu.apply_settings()
@@ -502,7 +536,7 @@ local function draw_main(time, W, H)
   end
   local it = ITEMS[Menu.sel]
   Render.text(it.sub, W / 2, 98 + #ITEMS * 30 + 2, UI.dim, "small", "center", W)   -- sotto l'ultimo pulsante
-  Render.text("v0.12", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text("v0.13", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 
@@ -794,57 +828,65 @@ local function draw_settings(time, W, H)
   local y = 50
   for i, row in ipairs(SETTINGS) do
     if row.header then
-      Render.text(row.header, x + 4, y + 6, UI.coral, "small", "left", 200)
+      Render.text(row.header, x + 4, y + 4, UI.coral, "small", "left", 200)
       lg.setColor(UI.coral[1], UI.coral[2], UI.coral[3], 0.3)
-      lg.rectangle("fill", x + 50, y + 10, w - 54, 1)
-      y = y + 18
+      lg.rectangle("fill", x + 50, y + 8, w - 54, 1)
+      y = y + 15
     else
       local idx
       for k, v in ipairs(SEL_ROWS) do if v == i then idx = k end end
       local on = Menu.sel == idx
       local k = anim("set" .. i, on)
       setc(lerpc(UI.panel, UI.panel_l, 0.3 + 0.7 * k))
-      lg.rectangle("fill", x, y, w, 21, 4, 4)
+      lg.rectangle("fill", x, y, w, 18, 4, 4)
       if k > 0.05 then
         lg.setColor(UI.gold[1], UI.gold[2], UI.gold[3], k)
-        lg.rectangle("fill", x, y + 3, 3, 15, 1, 1)
+        lg.rectangle("fill", x, y + 2, 3, 14, 1, 1)
       end
-      Render.text(row.label, x + 12 + 3 * k, y + 2, on and UI.gold or UI.text, "mid", "left", 260)
+      Render.text(row.label, x + 12 + 3 * k, y + 1, on and UI.gold or UI.text, "mid", "left", 260)
       local cx = x + w - 170
       if row.kind == "slider" then
         local v = st[row.key]
         local bw = 120
-        setc(UI.ink); lg.rectangle("fill", cx, y + 8, bw, 6, 3, 3)
+        setc(UI.ink); lg.rectangle("fill", cx, y + 6, bw, 6, 3, 3)
         setc(on and UI.gold or UI.dim); lg.rectangle("fill", cx, y + 8, max(4, bw * v), 6, 3, 3)
-        lg.setColor(1, 1, 1); lg.circle("fill", cx + bw * v, y + 11, 4 + k)
-        setc(UI.ink); lg.circle("line", cx + bw * v, y + 11, 4 + k)
-        Render.text(floor(v * 100 + 0.5) .. "%", cx + bw + 10, y + 6, UI.dim, "small", "left", 40)
+        lg.setColor(1, 1, 1); lg.circle("fill", cx + bw * v, y + 9, 4 + k)
+        setc(UI.ink); lg.circle("line", cx + bw * v, y + 9, 4 + k)
+        Render.text(floor(v * 100 + 0.5) .. "%", cx + bw + 10, y + 5, UI.dim, "small", "left", 40)
         local function from_mouse()
           if love.mouse and love.mouse.isDown and love.mouse.isDown(1) then
             set_setting(row, (Menu.mx - cx) / bw)
           end
         end
-        hit(x, y, w, 21, function()
+        hit(x, y, w, 18, function()
           if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end
           from_mouse()
         end, function()
           Menu.sel = idx
           if Menu.mx >= cx - 6 then set_setting(row, (Menu.mx - cx) / bw) end
         end)
+      elseif row.kind == "choice" then
+        local v = st[row.key] or "1280x720"
+        local full = st.fullscreen
+        setc(UI.ink); lg.rectangle("fill", cx, y + 3, 120, 13, 4, 4)
+        Render.text("<  " .. v:gsub("x", " x ") .. "  >", cx + 60, y + 5, full and UI.dim or (on and UI.gold or UI.text), "small", "center", 120)
+        if full then Render.text("(schermo intero)", cx + 128, y + 5, UI.dim, "small", "left", 120) end
+        hit(x, y, w, 18, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
+          function() Menu.sel = idx; settings_press(Menu.mx < cx + 60 and "left" or "right") end)
       elseif row.kind == "toggle" then
         local v = st[row.key]
         local kk = anim("tog" .. i, v)
-        setc(lerpc(UI.ink, UI.green, kk * 0.8)); lg.rectangle("fill", cx, y + 4, 34, 13, 6, 6)
-        lg.setColor(1, 1, 1); lg.circle("fill", cx + 7 + 20 * kk, y + 10.5, 5)
-        Render.text(v and "SI" or "NO", cx + 44, y + 6, v and UI.green or UI.dim, "small", "left", 40)
-        hit(x, y, w, 21, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
+        setc(lerpc(UI.ink, UI.green, kk * 0.8)); lg.rectangle("fill", cx, y + 2.5, 34, 13, 6, 6)
+        lg.setColor(1, 1, 1); lg.circle("fill", cx + 7 + 20 * kk, y + 9, 5)
+        Render.text(v and "SI" or "NO", cx + 44, y + 5, v and UI.green or UI.dim, "small", "left", 40)
+        hit(x, y, w, 18, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
           function() Menu.sel = idx; settings_press("ok") end)
       else
-        Render.text("Invio", cx, y + 6, UI.dim, "small", "left", 80)
-        hit(x, y, w, 21, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
+        Render.text("Invio", cx, y + 5, UI.dim, "small", "left", 80)
+        hit(x, y, w, 18, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
           function() Menu.sel = idx; settings_press("ok") end)
       end
-      y = y + 23
+      y = y + 20
     end
   end
   footer("Su/giu: scegli    Sinistra/destra o click: cambia    Esc/B: salva e torna", W, H)

@@ -48,8 +48,7 @@ function love.load(args)
   end
 
   lg.setDefaultFilter("nearest", "nearest")
-  canvas = lg.newCanvas(Render.W * Render.SS, Render.H * Render.SS)
-  canvas:setFilter("nearest", "nearest")
+  fit_canvas()
   Render.load()
   Audio.load()
   Sprites.load()
@@ -491,7 +490,25 @@ local function draw_crosshair()
   lg.setColor(1, 1, 1, 1)
 end
 
+-- La canvas segue la risoluzione dello schermo: a 1080p e' 1920x1080, a 1440p 2560x1440, ecc.
+-- Cosi' si disegna gia' alla misura giusta e non si ingrandisce un'immagine piccola.
+-- Con "Scala pixel perfetta" la densita' resta un numero intero (bordi neri se serve).
+function fit_canvas()
+  local sw, sh = lg.getDimensions()
+  local ss = math.max(1, math.min(sw / Render.W, sh / Render.H))
+  if Profile.data and Profile.data.settings and Profile.data.settings.pixel_perfect then ss = math.max(1, math.floor(ss)) end
+  if __shot then ss = 2 end   -- screenshot di prova sempre uguali
+  local cw, ch = math.floor(Render.W * ss + 0.5), math.floor(Render.H * ss + 0.5)
+  if canvas and canvas:getWidth() == cw and canvas:getHeight() == ch then return end
+  Render.SS = ss
+  canvas = lg.newCanvas(cw, ch)
+  canvas:setFilter("nearest", "nearest")
+end
+
+function love.resize() fit_canvas() end
+
 function love.draw()
+  fit_canvas()
   if not canvas then return end
   lg.setCanvas(canvas)
   lg.clear(0, 0, 0, 1)
@@ -523,7 +540,7 @@ function love.draw()
   lg.pop()
   lg.setCanvas()
 
-  local cw, ch = Render.W * Render.SS, Render.H * Render.SS
+  local cw, ch = canvas:getWidth(), canvas:getHeight()
   local sw, sh = lg.getDimensions()
   local s = math.min(sw / cw, sh / ch)
   if s >= 1 and Profile.data.settings.pixel_perfect then s = math.floor(s) end

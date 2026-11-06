@@ -38,7 +38,8 @@ local EXPLOSIVE = { grenade = true, bazooka = true, mines = true, swarm = true }
 
 Profile.DEFAULT_SETTINGS = {
   master = 0.8, music = 0.6, sfx = 0.8,                  -- volumi 0..1
-  fullscreen = false, vsync = true, pixel_perfect = true, -- video
+  fullscreen = false, vsync = true, pixel_perfect = false, -- video
+  resolution = "1280x720",                               -- finestra (in schermo intero si usa lo schermo)
   shake = 1, flash = 1,                                  -- intensita' di scosse e lampi 0..1
   vibration = true, bot_level = 2,                       -- vibrazione controller, livello bot 1-3
 }

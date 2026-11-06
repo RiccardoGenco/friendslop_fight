@@ -2,6 +2,7 @@ function love.conf(t)
   t.identity = "partygame"
   t.version = "11.5"
   t.window.title = "Friendslop Fight"
+  t.window.icon = "assets/icon.png"
   t.window.width = 1280
   t.window.height = 720
   t.window.resizable = true
