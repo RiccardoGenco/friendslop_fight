@@ -206,7 +206,7 @@ local function try_attack(p, game, inp)
   return true
 end
 
-local function apply_movement(p, inp)
+local function apply_movement(p, inp, world)
   local P = data.player
   local M = data.momentum
   local a = p.action
@@ -225,6 +225,8 @@ local function apply_movement(p, inp)
   local reversing = (target == 0) or (p.vx ~= 0 and sign(target) ~= sign(p.vx))
   if p.grounded then
     accel = reversing and P.decel_ground or P.accel_ground
+    -- ghiaccio: si scivola, partire e fermarsi costa molto
+    if world and world:ice_under(p) then accel = accel * data.terrain.ice_grip end
   else
     accel = reversing and P.decel_air or P.accel_air
   end
@@ -423,11 +425,11 @@ function Player.update(p, inp, game)
     elseif p.wall_lock > 0 then
       -- dopo il salto dal muro il controllo torna un po' alla volta
       local keep = p.vx
-      apply_movement(p, inp)
+      apply_movement(p, inp, world)
       local k = p.wall_lock / (p.wall_lock_max or P.wall_lock)
       p.vx = keep * k + p.vx * (1 - k)
     else
-      apply_movement(p, inp)
+      apply_movement(p, inp, world)
       -- agganciati al muro non ci si allontana finche' non ci si stacca
       if p.sliding and p.vx * p.wall < 0 then p.vx = 0 end
     end

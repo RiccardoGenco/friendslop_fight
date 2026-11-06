@@ -59,6 +59,17 @@ M.player = {
 M.gadgets = { spring_vel = 560, belt_speed = 75, portal_cd = 40 }
 
 -- Eventi di mappa (src/sim/mapevents.lua). Tempi in frame (60 = 1 secondo).
+-- terreno: quasi tutto si rompe con le armi
+M.terrain = {
+  block_hp = 30,          -- punti vita di un blocco distruttibile
+  bullet_mul = 1,         -- quanto del danno di un proiettile va al blocco colpito
+  melee_mul = 1.6,        -- le armi da mischia scavano meglio
+  ice_grip = 0.13,        -- sul ghiaccio accelerare e frenare costa molto di piu'
+  crumble_frames = 34,    -- un blocco friabile regge cosi' tanto dopo che ci sei salito
+  tnt_delay = 8,          -- frame tra un barile che si rompe e la sua esplosione (reazioni a catena)
+  tnt_blast = { radius = 44, dmg = 30, kb = 330, self_mul = 1 },
+}
+
 M.map_events = {
   first_min = 360, first_max = 540,                      -- primo evento dopo 6-9 s
   every_min = 600, every_max = 840,                      -- poi ogni 10-14 s a inizio round...

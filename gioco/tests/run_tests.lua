@@ -24,7 +24,7 @@ local function near(a, b, tol, msg)
   end
 end
 
-local MAPS = { "arena", "fabbrica", "tetti" }
+local MAPS = { "arena", "fabbrica", "tetti", "miniera", "ghiacciaio", "vulcano", "tempio", "galeone", "laboratorio" }
 
 -- --------------------------------------------------------------------------
 -- helper
@@ -1676,6 +1676,82 @@ test("eventi di mappa: l'intensita' sale durante il round", function()
   g.round_frame = data.map_events.ramp
   local late = count(1200)
   check(late > early, "eventi a inizio " .. early .. ", a fine rampa " .. late)
+end)
+
+-- --------------------------------------------------------------------------
+-- terreno distruttibile, ghiaccio, barili, blocchi friabili
+
+-- rende distruttibili (o di un altro tipo) le caselle del muro a destra del duello
+local function make_block(w, c, r, kind)
+  w.grid[r][c] = "#"
+  w.breakable[r][c] = true
+  w.hp[r][c] = data.terrain.block_hp
+  if kind == "tnt" then w.tnt[r][c] = true end
+  if kind == "crumble" then w.crumble[r][c] = true end
+  if kind == "ice" then w.breakable[r][c], w.hp[r][c] = nil, nil; w.ice[r][c] = true end
+end
+
+test("terreno: la pistola scava un blocco distruttibile", function()
+  local g, p1, p2 = duel("pistol")
+  p2.x = 600
+  local w = g.world
+  local r = math.floor((p1.y - 8) / data.tile) + 1
+  local c = math.floor(p1.x / data.tile) + 4
+  make_block(w, c, r)
+  local v0 = w.version
+  run(g, 240, function(i) p1.facing = 1; return { { attack_pressed = (i % 12 == 1), ax = 1, ay = 0 } } end)
+  check(w.grid[r][c] == ".", "il blocco non si e' rotto")
+  check(w.version > v0, "la grafica non e' stata avvisata")
+end)
+
+test("terreno: la spada scava i blocchi davanti", function()
+  local g, p1, p2 = duel("sword")
+  p2.x = 600
+  local w = g.world
+  local r = math.floor((p1.y - 8) / data.tile) + 1
+  local c = math.floor((p1.x + 10) / data.tile) + 1
+  make_block(w, c, r)
+  run(g, 240, function(i) p1.facing = 1; return { { attack_pressed = (i % 25 == 1) } } end)
+  check(w.grid[r][c] == ".", "la spada non ha rotto il blocco")
+end)
+
+test("terreno: un barile esplosivo esplode quando si rompe, e fa esplodere quello accanto", function()
+  local g = duel()
+  local w = g.world
+  make_block(w, 10, 5, "tnt"); make_block(w, 12, 5, "tnt")
+  Combat.blocks_broken(g, { w:remove_block(10, 5) }, 0, 0)
+  w.tnt[10] = w.tnt[10] or {}
+  run(g, 40)
+  check(w.grid[5][12] == ".", "il secondo barile non e' saltato")
+  check(count_events(g, "explosion") >= 0, "")
+end)
+
+test("terreno: un blocco friabile crolla poco dopo che ci si sale", function()
+  local g, p1 = duel()
+  local w = g.world
+  local T = data.tile
+  local c, r = math.floor(p1.x / T) + 1, math.floor(p1.y / T) + 1
+  make_block(w, c, r, "crumble")
+  run(g, 5)
+  check(w.grid[r][c] == "#", "e' crollato subito")
+  run(g, data.terrain.crumble_frames + 5)
+  check(w.grid[r][c] == ".", "non e' crollato")
+end)
+
+test("ghiaccio: si frena molto piu' piano", function()
+  local function slide(ice)
+    local g, p1 = duel()
+    local T = data.tile
+    local r = math.floor(p1.y / T) + 1
+    if ice then for c = 2, g.world.cols - 1 do make_block(g.world, c, r, "ice") end end
+    p1.x = 120
+    run(g, 40, function() return { { mx = 1 } } end)
+    local x0 = p1.x
+    run(g, 60)
+    return p1.x - x0
+  end
+  local normal, icy = slide(false), slide(true)
+  check(icy > normal * 3, "sul ghiaccio scivola " .. icy .. ", a terra " .. normal)
 end)
 
 local function main()

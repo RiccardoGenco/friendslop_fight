@@ -282,11 +282,59 @@ local function clash(game, a, b)
 end
 
 -- ---------------------------------------------------------------------------
+-- Terreno distruttibile
+
+-- blocchi rotti: effetti e barili esplosivi in coda (esplodono poco dopo, cosi' le catene si vedono)
+function Combat.blocks_broken(game, list, x, y)
+  if not list or #list == 0 then return end
+  game:emit("blocks_broken", x, y, { list = list })
+  for _, b in ipairs(list) do
+    if b.tnt then
+      game.tnt_queue = game.tnt_queue or {}
+      game.tnt_queue[#game.tnt_queue + 1] = { x = b.x, y = b.y, t = data.terrain.tnt_delay }
+      game:emit("tnt_lit", b.x, b.y, {})
+    end
+  end
+end
+
+function Combat.update_tnt(game)
+  local q = game.tnt_queue
+  if not q or #q == 0 then return end
+  local i = 1
+  while i <= #q do
+    local e = q[i]
+    e.t = e.t - 1
+    if e.t <= 0 then
+      table.remove(q, i)
+      Combat.explode(game, e.x, e.y, data.terrain.tnt_blast, nil, "barile")
+    else
+      i = i + 1
+    end
+  end
+end
+
+-- un colpo che arriva su un muro scalfisce il blocco (se si puo' rompere)
+local function chip(game, x, y, dmg)
+  if not dmg or dmg <= 0 then return end
+  local T = data.tile
+  local c, r = math.floor(x / T) + 1, math.floor(y / T) + 1
+  local b = game.world:damage_block(c, r, dmg * data.terrain.bullet_mul)
+  if b then Combat.blocks_broken(game, { b }, b.x, b.y)
+  elseif game.world.breakable[r] and game.world.breakable[r][c] then game:emit("block_hit", x, y, {}) end
+end
+
+-- ---------------------------------------------------------------------------
 -- Colpi in mischia
 
 function Combat.melee_check(game, p, a)
   local def = a.def
   local x1, y1, x2, y2 = Combat.melee_rect(p, def)
+  if not a.dug then
+    -- la lama scava: ogni colpo danneggia i blocchi che tocca, una volta sola
+    a.dug = true
+    local list = game.world:damage_rect(x1, y1, x2, y2, (def.damage or 0) * a.mul * data.terrain.melee_mul)
+    Combat.blocks_broken(game, list, (x1 + x2) / 2, (y1 + y2) / 2)
+  end
   for _, t in ipairs(game.players) do
     if t.id ~= p.id and t.alive and not a.hit[t.id] then
       local hx1, hy1, hx2, hy2 = hurtbox(t)
@@ -606,10 +654,12 @@ function Combat.update_projectiles(game)
           local nx = pr.x + sx
           if world:tile_at(nx, pr.y) == "#" then
             if pr.bounces > 0 then
+              if pr.on_impact ~= "explode" then chip(game, nx, pr.y, pr.dmg) end
               bounce(game, pr, "x")
               local k = pr.bounce_keep or 0.85
               sx, sy = -sx * k, sy * k
             else
+              if pr.on_impact ~= "explode" then chip(game, nx, pr.y, pr.dmg) end
               local r = wall_impact(game, pr)
               if r ~= "stop" then outcome = r end
               break
@@ -629,10 +679,12 @@ function Combat.update_projectiles(game)
           end
           if solid_y then
             if pr.bounces > 0 then
+              if pr.on_impact ~= "explode" and tile_y == "#" then chip(game, pr.x, ny, pr.dmg) end
               bounce(game, pr, "y")
               local k = pr.bounce_keep or 0.85
               sx, sy = sx * k, -sy * k
             else
+              if pr.on_impact ~= "explode" and tile_y == "#" then chip(game, pr.x, ny, pr.dmg) end
               local r = wall_impact(game, pr)
               if r ~= "stop" then outcome = r end
               break
@@ -732,8 +784,7 @@ function Combat.explode(game, x, y, blast, owner, wid)
   if not blast then return end
   local world = game.world
   game:emit("explosion", x, y, { radius = blast.radius })
-  local broken = world:break_blocks(x, y, blast.radius * 0.75)
-  if #broken > 0 then game:emit("blocks_broken", x, y, { list = broken }) end
+  Combat.blocks_broken(game, world:break_blocks(x, y, blast.radius * 0.75), x, y)
   for _, t in ipairs(game.players) do
     if t.alive and t.invuln <= 0 then
       local cx, cy = t.x, t.y - t.h / 2

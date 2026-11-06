@@ -18,6 +18,11 @@ local KINDS = {
   Fabbrica = { "barrels", "press" },
   Tetti = { "lightning", "wind" },
   Miniera = { "rocks", "barrels" },
+  Ghiacciaio = { "rocks", "wind" },        -- stalattiti che cadono, bufera
+  Vulcano = { "geyser", "rocks" },         -- colonne di fuoco, lapilli
+  Tempio = { "rocks", "lightning" },
+  Galeone = { "barrels", "wind" },         -- barili rotolati giu', raffiche di mare
+  Laboratorio = { "press", "lightning" },
 }
 
 local COLUMN = { lightning = true, press = true, geyser = true }
@@ -132,8 +137,7 @@ local function strike(game, h, spec)
     end
   end
   if spec.breaks then
-    local broken = game.world:break_blocks(h.x, (h.y0 + h.y2) / 2, math.max(h.width, (h.y2 - h.y0) / 2))
-    if #broken > 0 then game:emit("blocks_broken", h.x, h.y2, { list = broken }) end
+    Combat.blocks_broken(game, game.world:break_blocks(h.x, (h.y0 + h.y2) / 2, math.max(h.width, (h.y2 - h.y0) / 2)), h.x, h.y2)
   end
   game:emit(h.kind, h.x, h.y2, { y1 = h.y0, width = h.width })
 end
@@ -205,8 +209,7 @@ function E.update(game)
       if victim or landed then
         if h.kind == "rocks" then
           if victim then Combat.hazard_hit(game, victim, spec.dmg, "masso") end
-          local broken = game.world:break_blocks(h.x, h.y + spec.size / 2, 10)
-          if #broken > 0 then game:emit("blocks_broken", h.x, h.y, { list = broken }) end
+          Combat.blocks_broken(game, game.world:break_blocks(h.x, h.y + spec.size / 2, 10), h.x, h.y)
           game:emit("rock", h.x, h.y, {})
         else
           Combat.explode(game, h.x, h.y, spec.blast, nil, "barile")

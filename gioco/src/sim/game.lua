@@ -19,7 +19,7 @@ local Gadgets = require("src.sim.gadgets")
 local Game = {}
 Game.__index = Game
 
-local MAP_NAMES = { "arena", "fabbrica", "tetti", "miniera" }
+local MAP_NAMES = { "arena", "fabbrica", "tetti", "miniera", "ghiacciaio", "vulcano", "tempio", "galeone", "laboratorio" }
 local EMPTY = {}
 local min, max = math.min, math.max
 
@@ -81,6 +81,7 @@ function Game:start_round(forced_map)
   while #self.recent_maps > R.map_repeat_block do table.remove(self.recent_maps, 1) end
 
   self.world = World.new(require("src.maps." .. self.map_name))
+  self.tnt_queue = {}
   local world = self.world
 
   local spawns = {}
@@ -492,6 +493,8 @@ function Game:update(inputs)
     Gadgets.update(self)
     Combat.update_projectiles(self)
     Combat.update_fields(self)
+    Combat.update_tnt(self)
+    Combat.blocks_broken(self, self.world:update_crumble(self.players), 0, 0)
     self:update_items()
     self:update_pickups(inputs)
     self:update_hazards()

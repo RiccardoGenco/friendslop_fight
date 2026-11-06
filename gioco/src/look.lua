@@ -50,6 +50,42 @@ THEMES.Miniera = {
   plat = { 0.62, 0.42, 0.22 }, spike = { 0.55, 0.45, 0.38 }, deco = "mine", ambient = "dust",
 }
 
+THEMES.Ghiacciaio = {
+  sky = { { 0.05, 0.08, 0.17 }, { 0.32, 0.50, 0.66 } }, moon = { 0.9, 0.97, 1 }, stars = true,
+  far = "peaks", farc = { 0.28, 0.38, 0.54 }, nearc = { 0.17, 0.24, 0.37 },
+  stone = { 0.62, 0.78, 0.90 }, top = { 0.93, 0.97, 1 }, pattern = "rock",
+  plat = { 0.55, 0.40, 0.28 }, spike = { 0.78, 0.92, 1 }, deco = "ice", ambient = "snow",
+  tex = "ghiacciaio", tint = { 0.88, 0.94, 1 }, debris = { 0.75, 0.88, 0.98 },
+}
+THEMES.Vulcano = {
+  sky = { { 0.07, 0.02, 0.03 }, { 0.46, 0.13, 0.05 } },
+  far = "volcano", farc = { 0.20, 0.08, 0.06 }, nearc = { 0.12, 0.05, 0.04 },
+  stone = { 0.32, 0.27, 0.26 }, top = { 0.42, 0.30, 0.25 }, pattern = "rock", lava = true,
+  plat = { 0.40, 0.30, 0.24 }, spike = { 1, 0.5, 0.1 }, deco = "lava", ambient = "embers",
+  tex = "vulcano", tint = { 0.95, 0.85, 0.82 }, debris = { 0.30, 0.25, 0.24 },
+}
+THEMES.Tempio = {
+  sky = { { 0.04, 0.10, 0.08 }, { 0.38, 0.52, 0.32 } },
+  far = "jungle", farc = { 0.10, 0.22, 0.14 }, nearc = { 0.06, 0.14, 0.09 },
+  stone = { 0.48, 0.52, 0.42 }, top = { 0.36, 0.66, 0.26 }, pattern = "rock",
+  plat = { 0.55, 0.40, 0.24 }, spike = { 0.70, 0.66, 0.60 }, deco = "arena", ambient = "leaves",
+  tex = "tempio", tint = { 0.86, 0.92, 0.86 }, debris = { 0.45, 0.50, 0.40 },
+}
+THEMES.Galeone = {
+  sky = { { 0.12, 0.12, 0.32 }, { 0.92, 0.55, 0.38 } }, moon = { 1, 0.75, 0.45 },
+  far = "sea", farc = { 0.24, 0.24, 0.42 }, nearc = { 0.14, 0.16, 0.32 }, sea = true,
+  stone = { 0.50, 0.34, 0.20 }, top = { 0.66, 0.48, 0.30 }, pattern = "rock",
+  plat = { 0.60, 0.42, 0.24 }, spike = { 0.70, 0.66, 0.62 }, deco = "ship", ambient = "dust",
+  tex = "galeone", tint = { 0.95, 0.86, 0.80 }, debris = { 0.50, 0.35, 0.20 },
+}
+THEMES.Laboratorio = {
+  sky = { { 0.03, 0.05, 0.10 }, { 0.10, 0.16, 0.26 } }, stars = true,
+  far = "grid", farc = { 0.12, 0.18, 0.28 }, nearc = { 0.08, 0.11, 0.18 },
+  stone = { 0.23, 0.28, 0.42 }, top = { 0.95, 0.75, 0.15 }, pattern = "lab",
+  plat = { 0.55, 0.60, 0.66 }, spike = { 0.68, 0.68, 0.74 }, deco = "factory", ambient = "sparks",
+  tex = "prova", tint = { 0.95, 1, 1.1 }, debris = { 0.30, 0.36, 0.50 },
+}
+
 local DEFAULT = {
   sky = { { 0.05, 0.06, 0.11 }, { 0.13, 0.15, 0.24 } }, stars = true,
   far = "grid", farc = { 0.12, 0.14, 0.22 }, nearc = { 0.08, 0.09, 0.15 },
@@ -60,6 +96,8 @@ THEMES.Arena.tex, THEMES.Fabbrica.tex, THEMES.Tetti.tex, THEMES.Miniera.tex = "a
 DEFAULT.tex = "prova"
 -- tinta delle texture: le accorda con la luce della mappa (tramonto, notte, grotta...)
 THEMES.Arena.tint = { 0.80, 0.68, 0.66 }
+THEMES.Arena.debris, THEMES.Fabbrica.debris = { 0.62, 0.48, 0.32 }, { 0.42, 0.50, 0.55 }
+THEMES.Tetti.debris, THEMES.Miniera.debris = { 0.50, 0.24, 0.20 }, { 0.48, 0.36, 0.25 }
 THEMES.Fabbrica.tint = { 0.80, 0.86, 0.86 }
 THEMES.Tetti.tint = { 0.72, 0.72, 0.86 }
 THEMES.Miniera.tint = { 0.85, 0.74, 0.66 }
@@ -210,7 +248,20 @@ local function tex_building(s, k, c, r, interior)
   if interior then tex_window(s, c, r) end   -- finestre nelle parti interne dei palazzi
 end
 
-local function draw_solid(w, th, c, r, x, y, anims)
+-- crepe sui blocchi danneggiati (stadio 1 o 2)
+local function draw_cracks(stage, c, r)
+  if stage <= 0 then return end
+  lg.setColor(0.05, 0.03, 0.03, 0.85)
+  local o = floor(hash(c * 3, r) * 10)
+  hp(5 + o, 3, 1, 5); hp(6 + o, 7, 1, 4); hp(7 + o, 11, 3, 1); hp(10 + o, 11, 1, 5); hp(11 + o, 15, 4, 1)
+  if stage >= 2 then
+    hp(22 - o, 18, 1, 6); hp(18 - o, 23, 5, 1); hp(17 - o, 23, 1, 5); hp(3, 25, 7, 1); hp(9, 20, 1, 5)
+    hp(24, 6, 5, 1); hp(24, 6, 1, 5)
+    lg.setColor(1, 1, 1, 0.18); hp(6 + o, 3, 1, 4); hp(23 - o, 18, 1, 5)
+  end
+end
+
+local function draw_solid(w, th, c, r, x, y, anims, kind)
   local function open(dc, dr) return w:tile(c + dc, r + dr) ~= "#" end
   local up, dn, lf, rt = open(0, -1), open(0, 1), open(-1, 0), open(1, 0)
   local d = depth(w, c, r)
@@ -225,6 +276,19 @@ local function draw_solid(w, th, c, r, x, y, anims)
     lg.setColor(k * tn[1], k * tn[2], k * tn[3])
     lg.draw(tx.img, tx.quad, x, y, 0, 0.5, 0.5)
     if p == "roof" and d >= 2 then tex_window(s, c, r) end
+    if kind == "bedrock" then
+      -- roccia madre: piu' scura, con un telaio di rinforzo (non si rompe)
+      lg.setColor(0.02, 0.02, 0.04, 0.45); hp(0, 0, 32, 32)
+      lg.setColor(0, 0, 0, 0.5); hp(0, 0, 32, 1); hp(0, 0, 1, 32)
+      lg.setColor(1, 1, 1, 0.08); hp(1, 1, 31, 1); hp(1, 1, 1, 31)
+    elseif kind == "ice" then
+      lg.setColor(0.55, 0.85, 1, 0.45); hp(0, 0, 32, 32)
+      lg.setColor(1, 1, 1, 0.35)
+      local o = floor(hash(c, r * 5) * 12)
+      hp(4 + o, 6, 2, 1); hp(6 + o, 7, 2, 1); hp(8 + o, 8, 2, 1); hp(18, 20, 3, 1); hp(21, 21, 2, 1)
+    else
+      draw_cracks(w:crack(c, r), c, r)
+    end
   elseif p == "brick" then tex_brick(s, k, c, r)
   elseif p == "panel" then tex_panel(s, k, c, r)
   elseif p == "rock" then tex_rock(s, k, c, r)
@@ -271,6 +335,33 @@ local function draw_solid(w, th, c, r, x, y, anims)
       tone(t, 0.6); hp(0, 5, 32, 1)
       lg.setColor(0.04, 0.03, 0.05); hp(0, 6, 32, 1)
       tone(t, 0.8); hp(floor(hash(c, r) * 24), 2, 4, 1)
+    elseif d2 == "ice" then
+      -- cappa di neve con gobbe, bordo azzurro
+      lg.setColor(0.70, 0.82, 0.95); hp(0, 0, 32, 7)
+      lg.setColor(0.95, 0.98, 1); hp(0, 0, 32, 5)
+      for i = 0, 3 do
+        local gx = i * 8 + floor(hash(c * 4 + i, r) * 4)
+        hp(gx, -1, 5, 1)
+      end
+      lg.setColor(1, 1, 1); hp(0, 0, 32, 1)
+      lg.setColor(0, 0, 0, 0.2); hp(0, 7, 32, 2)
+    elseif d2 == "lava" then
+      -- crosta bruciata con braci accese
+      lg.setColor(0.12, 0.09, 0.09); hp(0, 0, 32, 5)
+      lg.setColor(0.26, 0.20, 0.19); hp(0, 0, 32, 2)
+      for i = 0, 2 do
+        local gx = floor(hash(c * 6 + i, r * 2) * 28)
+        lg.setColor(1, 0.45 + 0.3 * hash(i, c), 0.1); hp(gx, 2, 2, 1)
+      end
+      lg.setColor(0, 0, 0, 0.3); hp(0, 5, 32, 2)
+    elseif d2 == "ship" then
+      -- tavole del ponte, chiare, con i chiodi
+      tone(t, 0.7); hp(0, 0, 32, 6)
+      tone(t, 1.05); hp(0, 0, 32, 4)
+      tone(t, 1.35); hp(0, 0, 32, 1)
+      lg.setColor(0.15, 0.1, 0.06); hp(((c * 13) % 3) * 10 + 4, 0, 1, 4)
+      lg.setColor(0.75, 0.75, 0.8); hp(2, 2, 1, 1); hp(29, 2, 1, 1)
+      lg.setColor(0, 0, 0, 0.3); hp(0, 6, 32, 2)
     elseif d2 == "mine" then
       -- crosta di terra con sassolini
       tone(t, 0.8); hp(0, 0, 32, 5)
@@ -330,6 +421,14 @@ local function draw_solid(w, th, c, r, x, y, anims)
       lg.setColor(0.25, 0.30, 0.28)
       rect(lf and x - 2 or x + T, y, 2, T)
     end
+  elseif d == "ice" then
+    if dn and hv < 0.5 then
+      local len = 3 + floor(hash(c, r * 5) * 7)
+      local vx = x + 3 + floor(hash(c * 3, r) * 9)
+      lg.setColor(0.75, 0.9, 1, 0.9)
+      lg.polygon("fill", vx, y + T, vx + 3, y + T, vx + 1.5, y + T + len)
+      lg.setColor(1, 1, 1, 0.8); rect(vx + 0.5, y + T, 1, len * 0.5)
+    end
   elseif d == "mine" then
     if dn and hv < 0.22 then
       -- trave di sostegno sotto il soffitto
@@ -358,12 +457,18 @@ end
 -- blocco distruttibile: cassa di legno (fabbrica, tetti) o roccia crepata (arena, miniera)
 local function draw_breakable(w, th, c, r, x, y)
   TX, TY = x, y
-  local crate = th.deco == "factory" or th.deco == "roofs"
+  local crate = th.deco == "factory" or th.deco == "roofs" or th.deco == "ship"
   local img = texture(crate and "blocco_cassa" or "blocco_pietra")
   if img then
     -- disegno dipinto; nella miniera la pietra prende il colore della roccia
     local tn = crate and { 1, 1, 1 } or (th.tint or { 1, 1, 1 })
     if th.deco == "mine" then tn = { 0.78, 0.62, 0.5 } end
+    if w.crumble[r][c] and not crate then
+      -- friabile: il colore della roccia della mappa, si riconosce dalle crepe
+      local st = th.stone
+      local m = 1.5 / math.max(st[1], st[2], st[3])
+      tn = { math.min(1, st[1] * m), math.min(1, st[2] * m), math.min(1, st[3] * m) }
+    end
     lg.setColor(tn[1], tn[2], tn[3])
     img.quad:setViewport(0, 0, 32, 32)
     lg.draw(img.img, img.quad, x, y, 0, 0.5, 0.5)
@@ -398,6 +503,12 @@ local function draw_breakable(w, th, c, r, x, y)
     tone(th.stone, 1.3); hp(0, 0, 32, 1); hp(0, 0, 1, 32)
     lg.setColor(0.04, 0.03, 0.05); hp(0, 31, 32, 1); hp(31, 0, 1, 32)
   end
+end
+
+local Art = require("src.art")
+local function draw_tnt(x, y)
+  -- barile rosso col fascione giallo: si vede da lontano che salta in aria
+  Art.draw(Art.BARREL, Art.BARREL_PAL, x - 1, y - 0.5, 0.9)
 end
 
 local function draw_belt_base(x, y)
@@ -488,7 +599,17 @@ local function draw_platform(w, th, c, r, x, y)
   if right_end then bracket(30, -1) end
 end
 
+local function draw_lava(x, y)
+  TX, TY = x, y
+  lg.setColor(0.55, 0.08, 0.02); hp(0, 0, 32, 32)
+  lg.setColor(0.95, 0.35, 0.05); hp(0, 4, 32, 28)
+  lg.setColor(1, 0.65, 0.15)
+  for i = 0, 3 do hp(i * 8 + floor(hash(x, i) * 4), 8 + floor(hash(i, x) * 16), 4, 2) end
+  lg.setColor(1, 0.85, 0.35); hp(0, 3, 32, 2)
+end
+
 local function draw_spikes(th, x, y)
+  if th.lava then return draw_lava(x, y) end
   TX, TY = x, y
   lg.setColor(0.04, 0.03, 0.05); hp(0, 25, 32, 7)
   lg.setColor(0.25, 0.22, 0.25); hp(0, 26, 32, 5)
@@ -591,6 +712,63 @@ local function far_layer(w, th, kind, color, near)
       lg.setColor(0.5, 0.8, 1, near and 0.25 or 0.12)
       lg.polygon("fill", cx, cy - 4, cx + 2, cy, cx, cy + 4, cx - 2, cy)
     end
+  elseif kind == "peaks" then
+    -- montagne innevate a punta
+    while x < W do
+      i = i + 1
+      local pw, ph = 80 + hash(i, 1) * 120, 90 + hash(i, 2) * (near and 90 or 170)
+      local px = x + pw / 2
+      col(color); lg.polygon("fill", x, base + 40, px, base - ph, x + pw, base + 40)
+      lg.setColor(0.9, 0.95, 1, near and 0.55 or 0.35)
+      lg.polygon("fill", px - pw * 0.12, base - ph * 0.72, px, base - ph, px + pw * 0.12, base - ph * 0.72)
+      x = x + pw * 0.6
+    end
+    col(color); rect(0, base + 30, W, H)
+  elseif kind == "volcano" then
+    -- coni vulcanici con la bocca accesa
+    for xx = 0, W, 4 do
+      local h = 30 + sin(xx * 0.01 + seed) * 20
+      col(color); rect(xx, base - h, 4, H)
+    end
+    while x < W do
+      i = i + 1
+      if hash(i, 1) > 0.4 then
+        local vw, vh = 120 + hash(i, 2) * 120, 100 + hash(i, 3) * (near and 60 or 140)
+        col(color, 1.1)
+        lg.polygon("fill", x, base, x + vw * 0.4, base - vh, x + vw * 0.6, base - vh, x + vw, base)
+        lg.setColor(1, 0.4, 0.1, near and 0.5 or 0.3); rect(x + vw * 0.42, base - vh, vw * 0.16, 4)
+      end
+      x = x + 140 + hash(i, 4) * 80
+    end
+  elseif kind == "jungle" then
+    -- chiome d'albero tonde e qualche tempio a gradoni
+    for xx = 0, W, 4 do
+      local h = 50 + sin(xx * 0.02 + seed) * 18 + sin(xx * 0.07) * 8
+      col(color); rect(xx, base - h, 4, H)
+    end
+    while x < W do
+      i = i + 1
+      local rr = 18 + hash(i, 1) * 26
+      col(color, 1.08); lg.circle("fill", x, base - 50 - hash(i, 2) * 40, rr)
+      if hash(i, 3) > 0.85 then
+        col(color, 1.25)
+        for k = 0, 3 do rect(x - 30 + k * 7, base - 60 - k * 14, 60 - k * 14, 14) end
+      end
+      x = x + 26 + hash(i, 4) * 30
+    end
+  elseif kind == "sea" then
+    -- orizzonte di mare con isolette e nuvole
+    col(color, 0.9); rect(0, base - 10, W, H)
+    while x < W do
+      i = i + 1
+      if hash(i, 1) > 0.7 then
+        local iw = 40 + hash(i, 2) * 80
+        col(color, 1.2); lg.ellipse("fill", x, base - 10, iw, 14 + hash(i, 3) * 16)
+      end
+      lg.setColor(1, 0.85, 0.75, near and 0.12 or 0.18)
+      lg.ellipse("fill", x + 40, base - 160 - hash(i, 5) * 80, 40 + hash(i, 6) * 40, 8)
+      x = x + 90 + hash(i, 4) * 90
+    end
   else
     col(color, 1, 0.5)
     for xx = 0, W, 48 do rect(xx, 0, 1, H) end
@@ -612,6 +790,7 @@ local function prepare(w)
   lg.setLineWidth(1)
   if not cv then
     cv = {}
+    require("src.fx").debris = th.debris
     cv.far = far_layer(w, th, th.far, th.farc, false)
     cv.near = far_layer(w, th, th.far, th.nearc, true)
     cv.map = lg.newCanvas(w.width, w.height, { dpiscale = 2 })   -- doppia densita': le texture restano nitide
@@ -653,11 +832,17 @@ local function prepare(w)
   for r = 1, w.rows_n do
     for c = 1, w.cols do
       local t, x, y = w.grid[r][c], (c - 1) * T, (r - 1) * T
-      if t == "#" and w.breakable[r] and w.breakable[r][c] then draw_breakable(w, th, c, r, x, y)
+      if t == "#" and w.tnt[r][c] then draw_tnt(x, y)
+      elseif t == "#" and w.crumble[r][c] then draw_breakable(w, th, c, r, x, y)
+      elseif t == "#" and w.breakable[r][c] then draw_solid(w, th, c, r, x, y, cv.anims)
       elseif t == "#" and w.belts[r] and w.belts[r][c] then draw_belt_base(x, y)
-      elseif t == "#" then draw_solid(w, th, c, r, x, y, cv.anims)
+      elseif t == "#" and w.ice[r][c] then draw_solid(w, th, c, r, x, y, cv.anims, "ice")
+      elseif t == "#" then draw_solid(w, th, c, r, x, y, cv.anims, "bedrock")
       elseif t == "=" then draw_platform(w, th, c, r, x, y); draw_hanging(w, th, c, r, x, y, cv.anims)
-      elseif t == "^" then draw_spikes(th, x, y) end
+      elseif t == "^" then
+        draw_spikes(th, x, y)
+        if th.lava and c % 3 == 0 then cv.anims[#cv.anims + 1] = { kind = "glow", x = x + T / 2, y = y + 4, color = { 1, 0.45, 0.1 }, seed = hash(c, r) } end
+      end
     end
   end
   lg.setCanvas()
@@ -709,6 +894,24 @@ function Look.map(w, time)
   local cv = prepare(w)
   lg.setColor(1, 1, 1)
   lg.draw(cv.map, 0, 0)
+  local th = Look.theme(w)
+  -- blocchi friabili che stanno per crollare: polvere che cade
+  for key, t in pairs(w.crumbling) do
+    local r, c = floor(key / 1000), key % 1000
+    local x, y = (c - 1) * T, (r - 1) * T
+    lg.setColor(0, 0, 0, 0.25 + 0.4 * (1 - t / 34)); rect(x, y, T, T)
+    lg.setColor(0.8, 0.75, 0.65, 0.8)
+    for k = 0, 2 do rect(x + 3 + k * 5 + sin(time * 40 + k) , y + T + ((time * 40 + k * 5) % 8), 1, 1) end
+  end
+  if th.sea then
+    -- onde davanti a tutto, in fondo alla mappa: chi ci cade affoga
+    local top = w.height - 22
+    for xx = 0, w.width, 4 do
+      local h = sin(xx * 0.05 + time * 2) * 2 + sin(xx * 0.13 - time * 3) * 1
+      lg.setColor(0.10, 0.22, 0.42, 0.92); rect(xx, top + h, 4, 30)
+      lg.setColor(0.35, 0.6, 0.85, 0.9); rect(xx, top + h, 4, 1.5)
+    end
+  end
   for _, a in ipairs(cv.anims) do
     local s = a.seed * 10
     if a.kind == "torch" then
@@ -865,6 +1068,20 @@ function Look.ambient(w, time)
       local y = H - (hash(i, 2) * H + time * (14 + hash(i, 3) * 22)) % H
       lg.setColor(1, 0.55 + 0.3 * hash(i, 4), 0.2, 0.35 + 0.35 * abs(sin(time * 3 + i)))
       rect(floor(x), floor(y), 1, 1)
+    end
+  elseif kind == "snow" then
+    for i = 1, 120 do
+      local x = (hash(i, 1) * W + sin(time * 0.7 + i) * 14 + time * 10) % W
+      local y = (hash(i, 2) * H + time * (25 + hash(i, 3) * 30)) % H
+      lg.setColor(1, 1, 1, 0.35 + 0.4 * hash(i, 4))
+      rect(floor(x), floor(y), hash(i, 5) > 0.7 and 2 or 1, hash(i, 5) > 0.7 and 2 or 1)
+    end
+  elseif kind == "leaves" then
+    for i = 1, 26 do
+      local x = (hash(i, 1) * W + sin(time * 1.1 + i) * 20 + time * 14) % W
+      local y = (hash(i, 2) * H + time * (18 + hash(i, 3) * 16)) % H
+      lg.setColor(0.35 + 0.3 * hash(i, 4), 0.6, 0.2, 0.6)
+      rect(floor(x), floor(y), 2, 1)
     end
   elseif kind == "sparks" then
     for i = 1, 30 do

@@ -437,11 +437,20 @@ function Fx.handle(e, game)
     Fx.burst(e.tx, e.ty, c, e.small and 4 or 12, 110, 0.3, 0, 1)
     if not e.small then Audio.play("pickup", 0.6, 0.6); Audio.play("telegraph", 1.8, 0.4) end
   elseif t == "blocks_broken" then
+    local dc = Fx.debris or { 0.55, 0.42, 0.3 }
+    local n = #(e.list or {})
     for _, b in ipairs(e.list or {}) do
-      Fx.chunks(b.x, b.y, { 0.55, 0.42, 0.3 }, 4, 180, 0.9, 3)
-      Fx.puffs(b.x, b.y, { 0.5, 0.45, 0.4 }, 2, 40, 0.6, -10, 5, 1)
+      Fx.chunks(b.x, b.y, dc, n > 6 and 2 or 4, 180, 0.9, 3)
+      Fx.puffs(b.x, b.y, { dc[1] * 0.9 + 0.1, dc[2] * 0.9 + 0.1, dc[3] * 0.9 + 0.1 }, 2, 40, 0.6, -10, 5, 1)
     end
     Audio.play("break_", 0.8)
+  elseif t == "block_hit" then
+    -- colpo su un blocco che regge: schegge piccole, si capisce che si sta scavando
+    local dc = Fx.debris or { 0.55, 0.42, 0.3 }
+    Fx.chunks(e.x, e.y, dc, 2, 110, 0.4, 2)
+  elseif t == "tnt_lit" then
+    Fx.burst(e.x, e.y, { 1, 0.75, 0.25 }, 8, 70, 0.3, 0, 1)
+    Audio.play("telegraph", 1.6, 0.5)
   elseif t == "rock" then
     Fx.chunks(e.x, e.y, { 0.52, 0.47, 0.41 }, 8, 200, 0.8, 3)
     Fx.puffs(e.x, e.y + 4, { 0.62, 0.56, 0.5 }, 10, 90, 0.8, -20, 5, 1.2)
