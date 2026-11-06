@@ -59,6 +59,8 @@ local SETTINGS = {
   { key = "shake", label = "Scosse dello schermo", kind = "slider" },
   { key = "flash", label = "Lampi a schermo", kind = "slider" },
   { key = "vibration", label = "Vibrazione controller", kind = "toggle" },
+  { header = "LINGUA / LANGUAGE" },
+  { key = "lang", label = "Lingua", kind = "choice" },
   { key = "reset", label = "Ripristina predefinite", kind = "action" },
 }
 local SEL_ROWS = {}
@@ -81,6 +83,12 @@ local function resolutions()
   return list
 end
 Menu.resolutions = resolutions
+local LANGS = { "en", "it" }
+local LANG_NAME = { en = "English", it = "Italiano" }
+local function choices(row)
+  if row.key == "lang" then return LANGS end
+  return resolutions()
+end
 
 -- applica volumi, finestra ed effetti; da chiamare dopo ogni modifica
 function Menu.apply_settings()
@@ -89,6 +97,9 @@ function Menu.apply_settings()
   Audio.music_mul = st.master * st.music
   local Fx = require("src.fx")
   Fx.shake_mul, Fx.flash_mul = st.shake, st.flash
+  local Lang = require("src.lang")
+  Lang.set(st.lang)
+  require("src.sim.fusion").namer = Lang.code == "en" and Lang.fusion_name or nil
   local w = love.window
   if w and w.getFullscreen then
     pcall(function()
@@ -131,7 +142,7 @@ local function settings_press(b)
     if row.kind == "slider" then set_setting(row, st[row.key] + d * 0.1)
     elseif row.kind == "toggle" then set_setting(row, d > 0)
     elseif row.kind == "choice" then
-      local list, cur = resolutions(), 1
+      local list, cur = choices(row), 1
       for i, r in ipairs(list) do if r == st[row.key] then cur = i end end
       set_setting(row, list[(cur - 1 + d) % #list + 1])
     end
@@ -536,7 +547,7 @@ local function draw_main(time, W, H)
   end
   local it = ITEMS[Menu.sel]
   Render.text(it.sub, W / 2, 98 + #ITEMS * 30 + 2, UI.dim, "small", "center", W)   -- sotto l'ultimo pulsante
-  Render.text("v0.13", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
+  Render.text("v0.14", 8, H - 30, { 0.4, 0.4, 0.55 }, "small", "left", 60)
   footer("Frecce / WASD / croce: muovi    Invio / A / click: scegli    Esc / B: indietro", W, H)
 end
 
@@ -824,8 +835,8 @@ local function draw_settings(time, W, H)
   Render.text("IMPOSTAZIONI", W / 2, 6, UI.gold, "big", "center", W)
   local st = Profile.data.settings
   local x, w = 110, W - 220
-  panel(x - 10, 44, w + 20, 272)
-  local y = 50
+  panel(x - 10, 42, w + 20, 288)
+  local y = 46
   for i, row in ipairs(SETTINGS) do
     if row.header then
       Render.text(row.header, x + 4, y + 4, UI.coral, "small", "left", 200)
@@ -867,7 +878,8 @@ local function draw_settings(time, W, H)
         end)
       elseif row.kind == "choice" then
         local v = st[row.key] or "1280x720"
-        local full = st.fullscreen
+        local full = st.fullscreen and row.key == "resolution"
+        if row.key == "lang" then v = LANG_NAME[v] or v end
         setc(UI.ink); lg.rectangle("fill", cx, y + 3, 120, 13, 4, 4)
         Render.text("<  " .. v:gsub("x", " x ") .. "  >", cx + 60, y + 5, full and UI.dim or (on and UI.gold or UI.text), "small", "center", 120)
         if full then Render.text("(schermo intero)", cx + 128, y + 5, UI.dim, "small", "left", 120) end
@@ -886,7 +898,7 @@ local function draw_settings(time, W, H)
         hit(x, y, w, 18, function() if Menu.sel ~= idx then Menu.sel = idx; sfx("ui_move") end end,
           function() Menu.sel = idx; settings_press("ok") end)
       end
-      y = y + 20
+      y = y + 19
     end
   end
   footer("Su/giu: scegli    Sinistra/destra o click: cambia    Esc/B: salva e torna", W, H)

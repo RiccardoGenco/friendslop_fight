@@ -328,6 +328,7 @@ function Fusion.name(w)
   if f.recipe then return Fusion.RECIPES[Fusion.recipe_key(f.body, f.donor)].name end
   local body_name = data.weapons[f.body].name
   local g = GENDER[f.body] or 1
+  if Fusion.namer then return Fusion.namer(body_name, f.trait, f.body == f.donor) end   -- altra lingua
   if f.body == f.donor then
     return DOUBLE[g] .. " " .. body_name:sub(1, 1):lower() .. body_name:sub(2)
   end

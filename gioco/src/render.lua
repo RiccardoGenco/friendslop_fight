@@ -103,7 +103,9 @@ end
 function Render.font(name) return fonts[name] end
 
 -- testo con ombra; align = "left" | "center" | "right" rispetto a x (centrato su limit se dato)
+local Lang = require("src.lang")
 function Render.text(str, x, y, color, font, align, limit)
+  str = Lang.t(str)
   lg.setFont(fonts[font or "small"])
   align = align or "left"
   limit = limit or 400
